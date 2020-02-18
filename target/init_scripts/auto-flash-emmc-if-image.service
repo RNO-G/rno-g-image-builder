@@ -1,0 +1,11 @@
+[Unit]
+Description=Auto flash internal mmc if image exists
+ConditionPathExists=/emmc-flash-4gb.img
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "dd if=/emmc-flash-4gb.img of=/dev/mmcblk1 bs=1M && rm /emmc-flash-4gb.img"
+
+[Install]
+WantedBy=multi-user.target

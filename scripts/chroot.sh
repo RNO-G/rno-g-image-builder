@@ -494,6 +494,10 @@ if [ "x${deb_arch}" = "xarmhf" ] ; then
 			#while bb-customizations installes "generic-board-startup.service" other boards/configs could use this default.
 			sudo cp "${OIB_DIR}/target/init_scripts/systemd-generic-board-startup.service" "${tempdir}/lib/systemd/system/generic-board-startup.service"
 			sudo chown root:root "${tempdir}/lib/systemd/system/generic-board-startup.service"
+
+			sudo cp "${OIB_DIR}/target/init_scripts/auto-flash-emmc-if-image.service" "${tempdir}/lib/systemd/system/"
+			sudo chown root:root "${tempdir}/lib/systemd/system/auto-flash-emmc-if-image.service"
+	
 			distro="Debian"
 			;;
 		esac
@@ -989,6 +993,12 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		if [ -f /lib/systemd/system/generic-board-startup.service ] ; then
 			systemctl enable generic-board-startup.service || true
 		fi
+
+		if [ -f /lib/systemd/system/auto-flash-emmc-if-image.service ] ; then
+			systemctl enable auto-flash-emmc-if-image.service || true
+		fi
+
+	
 
 		if [ ! "x${rfs_opt_scripts}" = "x" ] ; then
 			mkdir -p /opt/scripts/ || true
@@ -1527,6 +1537,7 @@ if [ "x${chroot_tarball}" = "xenable" ] ; then
 	sudo chown -R ${USER}:${USER} "${export_filename}.tar"
 	cd "${DIR}/" || true
 fi
+
 
 chroot_completed="true"
 #
