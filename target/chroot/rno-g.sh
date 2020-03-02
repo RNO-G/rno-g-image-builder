@@ -147,7 +147,9 @@ install_rno_g_software () {
   mkdir /rno-g/lib
   mkdir /rno-g/include
 
-  sed -i -e "s/PATH=/PATH=/rno-g/bin:" /etc/login.defs
+  mkdir /data 
+
+  sed -i -e "s#PATH=#PATH=/rno-g/bin:#" /etc/login.defs
   echo "/rno-g/lib" >> /etc/ld.so.conf.d/rno-g.conf 
 
   for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts 
