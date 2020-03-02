@@ -168,6 +168,9 @@ install_rno_g_software () {
 
   done
 
+  #download swissbit lifetime monitoring tool 
+  mkdir -p /usr/local/bin  #just in case
+  curl ftp://public:public@office.swissbit.com/SFxx_LTM_Tool/SBLTM-Linux-armv7-hard-float-1.7.0.tar.gz | tar -xz --strip-components 2 -C /usr/local/bin/ ./sbltm-linux-armv7-hard-float/sbltm-cli 
   ldconfig
 }
 
