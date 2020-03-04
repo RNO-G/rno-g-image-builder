@@ -1025,15 +1025,15 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		#We have systemd, so lets use it..
 
 		if [ -f /etc/systemd/systemd-journald.conf ] ; then
+			sed -i -e 's:#Storage=auto:Storage=persistent:g' /etc/systemd/systemd-journald.conf
 			sed -i -e 's:#SystemMaxUse=:SystemMaxUse=8M:g' /etc/systemd/systemd-journald.conf
 		fi
 
 		if [ -f /etc/systemd/journald.conf ] ; then
+			sed -i -e 's:#Storage=auto:Storage=persistent:g' /etc/systemd/journald.conf
 			sed -i -e 's:#SystemMaxUse=:SystemMaxUse=8M:g' /etc/systemd/journald.conf
 		fi
 
-    #persistent log 
-    mkdir -p /var/log/journal 
 
 		#systemd v215: systemd-timesyncd.service replaces ntpdate
 		#enabled by default in v216 (not in jessie)
