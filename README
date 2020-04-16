@@ -17,7 +17,6 @@ that it will boot off mmc by default unless sysboot2 is low on startup.
 
 
 TODO:
-- fork the boot scripts so they don't update underneath us to be incompatible 
-- figure out LTE networking 
+- figure out LTE networking (probably will be handled by rno-g-BBB-scripts make install) 
 - ??? 
 
