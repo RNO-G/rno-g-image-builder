@@ -1561,7 +1561,7 @@ populate_rootfs () {
 	fi
 
 	if [ ! -f ${TEMPDIR}/disk/opt/scripts/boot/generic-startup.sh ] ; then
-		git clone https://github.com/RobertCNelson/boot-scripts ${TEMPDIR}/disk/opt/scripts/ --depth 1
+		git clone https://github.com/rno-g/bbb-boot-scripts ${TEMPDIR}/disk/opt/scripts/ --depth 1
 		sudo chown -R 1000:1000 ${TEMPDIR}/disk/opt/scripts/
 	else
 		cd ${TEMPDIR}/disk/opt/scripts/
