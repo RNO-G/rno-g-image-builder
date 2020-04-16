@@ -160,7 +160,11 @@ install_rno_g_software () {
 
     cd ${git_target_dir} 
     if [ -f Makefile ] ; then 
-      make && PREFIX=/rno-g make install 
+      if [ "$gh_package" == "librno-g" ] ;  then
+        make daq && PREFIX=/rno-g make daq-install 
+      else
+        make && PREFIX=/rno-g make install 
+      fi
     fi 
 
     chown -R rno-g ${git_target_dir}
