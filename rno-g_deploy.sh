@@ -74,8 +74,8 @@ sudo echo $station_id > $emmcmountdir/STATION_ID
 sudo chmod 0444 $emmcmountdir/INTERNAL
 sudo chmod 0444 $emmcmountdir/STATION_ID
 sudo mkdir -p $emmcmountdir/mnt/sdcard 
-sudo echo "/dev/mmcblk0p1 /mnt/sdcard ext4 defaults 0 0 "  >> $emmcmountdir/etc/fstab
-sudo echo "/mnt/sdcard/data /data none defaults,bind 0 0 "  >> $emmcmountdir/etc/fstab
+sudo echo "/dev/mmcblk0p1 /mnt/sdcard ext4 defaults,nofail,x-systemd.device-timeout=1 0 0 "  >> $emmcmountdir/etc/fstab
+sudo echo "/mnt/sdcard/data /data none defaults,bind,nofail,x-systemd.device-timeout=1 0 0 "  >> $emmcmountdir/etc/fstab
 
 sudo umount $emmcmountdir
 sudo losetup --detach $loopdev
