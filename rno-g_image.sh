@@ -11,7 +11,7 @@ fi
 HOSTNAME_SUFFIX=${1}
 sed -e "s/#PLACEHOLDER_PASSWORD#/$RNO_G_PASSWORD/" configs/rno-g.conf > configs/rno-g.tmp.conf
 
-sudo ./RootStock-NG.sh -c rno-g.tmp.conf 
+sudo ./RootStock-NG.sh -c rno-g.tmp.conf || exit 1 
 rm configs/rno-g.tmp.conf
 
 
