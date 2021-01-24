@@ -2,10 +2,11 @@
 
 #beware: can only create different station id's in parallel! 
 station_id=0
+skip_sd=0
 
 if [ -z "$1" ] 
 then 
-  echo "Usage: ./rno-g_deploy.sh /dev/sdX [station-id=0]" 
+  echo "Usage: ./rno-g_deploy.sh /dev/sdX [station-id=0] [skip-sd=0]" 
   exit 1; 
 fi
 
@@ -13,6 +14,15 @@ if [ -z "$2" ]
 then 
   station_id=$2
 fi
+
+if [ -z "$3" ] 
+then 
+  echo "Formatting SD" 
+else
+  skip_sd=$3
+  echo "Skipping SD: $skip_sd" 
+fi
+
 
 echo "STATION ID is $station_id" 
 hostname=`printf rno-g-%03d "$station_id"` 
@@ -25,8 +35,15 @@ cd deploy/`cat latest_version` || exit 1
 prog=./setup_sdcard.sh 
 args="--dtb beaglebone --hostname $hostname"
 
+
+if [ "$skip_sd" -eq "0" ] ; 
+then
 #first, let's create the SD card image 
 sudo $prog --mmc $dev $args || exit 1 
+echo "Done, waiting a few seconds just in case" 
+sleep 5
+fi 
+
 
 #create one mount per station for parallelization
 sdmountdir=sdmount-$station_id
