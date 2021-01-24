@@ -2,7 +2,19 @@ RNO-G Disk Image Creation Tools
 
 Based on RobertCNelson's omap image builder. 
 
-This should be run on an ARM system (I use an rpi 4). 
+This should be run on an ARM system (I use an rpi 4), probably debian for best results.  
+
+Necessary packages: 
+	git 
+	debootstrap 
+  m4
+  dosfstools 
+  wget
+  parted
+  kpartx
+	
+
+
 
 
 Basic procedure: 
