@@ -12,6 +12,8 @@ fi
 
 if [ -z "$2" ] 
 then 
+  echo "Using default station id of 0" 
+else
   station_id=$2
 fi
 
@@ -26,6 +28,8 @@ fi
 
 echo "STATION ID is $station_id" 
 hostname=`printf rno-g-%03d "$station_id"` 
+echo $hostname
+
 
 dev=$1 
 orig_dir=`pwd` 
@@ -51,8 +55,8 @@ emmcmountdir=emmcmount-$station_id
 
 #then, let's mount it and create the emmc flasher image on there 
 sudo rm -rf $sdmountdir
-sudo mkdir $sdmountdir
-sudo mount "${dev}"1 $sdmountdir
+sudo mkdir $sdmountdir || exit 1 
+sudo mount "${dev}"1 $sdmountdir || exit 1
 
 #for some reason, it's actually called emmc-flash-4gb.img 
 sudo $prog --img-4gb $sdmountdir/emmc-flash.img $args --bootloader $orig_dir/emmc_boot/u-boot.img --spl $orig_dir/emmc_boot/MLO 
