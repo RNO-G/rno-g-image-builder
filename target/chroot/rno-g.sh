@@ -149,23 +149,36 @@ install_rno_g_software () {
 
   mkdir /data 
 
-  sed -i -e "s#PATH=#PATH=/rno-g/bin:#" /etc/login.defs
+  sed -i -e "s#PATH=#PATH=/rno-g/bin:#" /etc/profile
   echo "/rno-g/lib" >> /etc/ld.so.conf.d/rno-g.conf 
 
-  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts 
+
+  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python
   do
     git_repo="https://github.com/RNO-G/$gh_package"
     git_target_dir="/home/rno-g/$gh_package" 
     git_clone 
 
     cd ${git_target_dir} 
+
+    if [ -f requirements.txt ] ; then 
+      pip3 install -r requirements.txt
+    fi 
+
+    if [ -f setup.py ] ; then 
+      python3 setup.py build && python3 setup.py install 
+    fi
+
     if [ -f Makefile ] ; then 
       if [ "$gh_package" == "librno-g" ] ;  then
-        make daq && PREFIX=/rno-g make daq-install 
-      else
+        make daq && PREFIX=/rno-g make install-daq
+      elif [ "$gh_package" == "control-uC" ] ; then 
+        cd loader && make 
+      else 
         make && PREFIX=/rno-g make install 
       fi
     fi 
+
 
     chown -R rno-g ${git_target_dir}
     chgrp -R rno-g ${git_target_dir}
@@ -175,6 +188,19 @@ install_rno_g_software () {
   #download swissbit lifetime monitoring tool 
   mkdir -p /usr/local/bin  #just in case
   curl ftp://public:public@office.swissbit.com/SFxx_LTM_Tool/SBLTM-Linux-armv7-hard-float-1.7.0.tar.gz | tar -xz --strip-components 2 -C /usr/local/bin/ ./sbltm-linux-armv7-hard-float/sbltm-cli 
+
+
+  #directory for 3rd party deps 
+  depsdir=/home/rno-g/deps 
+  #download and install flashrom 
+  cd {$depsdir} 
+  curl https://download.flashrom.org/releases/flashrom-v1.2.tar.bz2 | tar xvf 
+  cd flashrom-v1.2 
+  make && make install 
+
+  chown -R rno-g $depsdir
+  chgrp -R rno-g $depsdir
+
   ldconfig
 }
 
