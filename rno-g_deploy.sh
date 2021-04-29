@@ -75,8 +75,11 @@ sudo sh -c "echo $station_id > $emmcmountdir/STATION_ID"
 sudo chmod 0444 $emmcmountdir/INTERNAL
 sudo chmod 0444 $emmcmountdir/STATION_ID
 sudo mkdir -p $emmcmountdir/mnt/sdcard 
+
+#work around wrong name for some reason: 
+sudo sed -i 's/mmcblk0p1/mmcblk1p1/g' $emmcmountdir/etc/fstab
 sudo sh -c "echo \"/dev/mmcblk0p1 /mnt/sdcard ext4 defaults,nofail,x-systemd.device-timeout=1 0 0 \"  >> $emmcmountdir/etc/fstab"
-sudo sh -c "echo \"/mnt/sdcard/data /data none defaults,bind,nofail,x-systemd.device-timeout=1 0 0 \"  >> $emmcmountdir/etc/fstab"
+sudo sh -c "echo \"/mnt/sdcard/data /data none defaults,bind,nofail 0 0 \"  >> $emmcmountdir/etc/fstab"
 
 sudo umount $emmcmountdir
 sudo losetup --detach $loopdev
