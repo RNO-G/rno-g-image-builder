@@ -193,8 +193,9 @@ install_rno_g_software () {
   #directory for 3rd party deps 
   depsdir=/home/rno-g/deps 
   #download and install flashrom 
-  cd {$depsdir} 
-  curl https://download.flashrom.org/releases/flashrom-v1.2.tar.bz2 | tar xvf 
+  mkdir -p ${depsdir}
+  cd ${depsdir} 
+  curl https://download.flashrom.org/releases/flashrom-v1.2.tar.bz2 | tar xjv 
   cd flashrom-v1.2 
   make && make install 
 
