@@ -203,6 +203,10 @@ install_rno_g_software () {
   chgrp -R rno-g $depsdir
 
   ldconfig
+
+  # increase spidev buf size 
+  echo "options spidev bufsiz=131072" > /etc/modprobe.d/spidev.conf 
+
 }
 
 
