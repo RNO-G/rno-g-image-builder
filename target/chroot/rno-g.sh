@@ -153,7 +153,7 @@ install_rno_g_software () {
   echo "/rno-g/lib" >> /etc/ld.so.conf.d/rno-g.conf 
 
 
-  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python
+  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal rnog_gps
   do
     git_repo="https://github.com/RNO-G/$gh_package"
     git_target_dir="/home/rno-g/$gh_package" 
