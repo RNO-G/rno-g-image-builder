@@ -185,10 +185,26 @@ install_rno_g_software () {
 
   done
 
-  #download swissbit lifetime monitoring tool 
-  mkdir -p /usr/local/bin  #just in case
-  curl ftp://public:public@office.swissbit.com/SFxx_LTM_Tool/SBLTM-Linux-armv7-hard-float-1.7.0.tar.gz | tar -xz --strip-components 2 -C /usr/local/bin/ ./sbltm-linux-armv7-hard-float/sbltm-cli 
+# summit branch, for now
+  git clone --branch summit-branch https://github.com/RNO-G/radiant-python radpy-cal 
+  chown -R rno-g:rno-g radpy-cal 
 
+#  #download swissbit lifetime monitoring tool (not anymore, it seems to have disappeared?) 
+#  mkdir -p /usr/local/bin  #just in case
+#  curl ftp://public:public@office.swissbit.com/SFxx_LTM_Tool/SBLTM-Linux-armv7-hard-float-1.7.0.tar.gz | tar -xz --strip-components 2 -C /usr/local/bin/ ./sbltm-linux-armv7-hard-float/sbltm-cli 
+
+
+  dldir=/home/rno-g/dl 
+  mkdir -p ${dldir}
+  cd ${dldir} 
+
+  chown -R rno-g:rno-g $dldir
+
+  # bossac 1.7.0 
+  curl -L https://github.com/shumatech/BOSSA/archive/refs/tags/1.7.0.tar.gz | tar xzv
+  cd BOSSA-1.7.0
+  make strip-bossac
+  cd
 
   #directory for 3rd party deps 
   depsdir=/home/rno-g/deps 

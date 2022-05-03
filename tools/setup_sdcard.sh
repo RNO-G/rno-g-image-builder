@@ -166,7 +166,7 @@ detect_software () {
 		dl="wget --no-check-certificate"
 		;;
 	*)
-		dl="wget"
+		dl="wget --no-check-certificate"
 		;;
 	esac
 
