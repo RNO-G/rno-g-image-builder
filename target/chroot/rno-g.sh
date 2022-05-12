@@ -186,6 +186,7 @@ install_rno_g_software () {
   done
 
 # summit branch, for now
+  cd
   git clone --branch summit-branch https://github.com/RNO-G/radiant-python radpy-cal 
   chown -R rno-g:rno-g radpy-cal 
 
