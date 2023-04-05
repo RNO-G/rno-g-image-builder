@@ -7,11 +7,11 @@ This should be run on an ARM system (I use an rpi 4), probably debian for best r
 Necessary packages: 
 	git 
 	debootstrap 
-  m4
-  dosfstools 
-  wget
-  parted
-  kpartx
+        m4
+        dosfstools 
+        wget
+        parted
+        kpartx
 	
 
 
@@ -27,8 +27,4 @@ The produced-SD card will autoflash the internal mmc on first boot with a
 basically identical version of itself (mounting /data from the sdcard). After
 that it will boot off mmc by default unless sysboot2 is low on startup. 
 
-
-TODO:
-- figure out LTE networking (probably will be handled by rno-g-BBB-scripts make install) 
-- ??? 
 
