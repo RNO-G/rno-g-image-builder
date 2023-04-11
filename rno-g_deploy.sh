@@ -1,4 +1,4 @@
-#! /bin/sh 
+#! /bin/bash 
 
 #beware: can only create different station id's in parallel! 
 station_id=0
@@ -19,7 +19,7 @@ fi
 
 if [ -z "$3" ] 
 then 
-  echo "Formatting SD" 
+  echo "Formatting SD (or image)" 
 else
   skip_sd=$3
   echo "Skipping SD: $skip_sd" 
@@ -43,7 +43,18 @@ args="--dtb beaglebone --hostname $hostname"
 if [ "$skip_sd" -eq "0" ] ; 
 then
 #first, let's create the SD card image 
-sudo $prog --mmc $dev $args || exit 1 
+mmcarg=--mmc 
+#if it doesn't start with /dev, assume mmc 
+if [[ $dev == /dev/* ]] ; then 
+  echo "This looks like a device" 
+elif [[ $dev == *.img ]] ; then 
+  echo "This looks like an image file" 
+  mmcarg=--img-8gb
+else 
+  echo "This looks like not an image nor a device..." 
+  exit 1
+fi
+sudo $prog $mmcarg $dev $args || exit 1 
 echo "Done, waiting a few seconds just in case" 
 sleep 5
 fi 
@@ -53,10 +64,20 @@ fi
 sdmountdir=sdmount-$station_id
 emmcmountdir=emmcmount-$station_id
 
+sdloopdev=none
+
 #then, let's mount it and create the emmc flasher image on there 
 sudo rm -rf $sdmountdir
 sudo mkdir $sdmountdir || exit 1 
+if [[ $mmcarg == "--mmc" ]] 
+then 
 sudo mount "${dev}"1 $sdmountdir || exit 1
+else 
+devname=${dev%.img}-8gb.img
+sdloopdev=$(sudo losetup --show -f -P $devname) 
+sudo mount "${sdloopdev}p1" $sdmountdir || exit 1
+fi
+
 
 #for some reason, it's actually called emmc-flash-4gb.img 
 sudo $prog --img-4gb $sdmountdir/emmc-flash.img $args --bootloader $orig_dir/emmc_boot/u-boot.img --spl $orig_dir/emmc_boot/MLO 
@@ -86,6 +107,11 @@ sudo losetup --detach $loopdev
 sudo rmdir $emmcmountdir
 
 sudo umount $sdmountdir
+
+if [[ "$sdloopdev" != "none" ]] ; then 
+sudo losetup --detach $sdloopdev
+fi
+
 sudo rmdir $sdmountdir
 
 cd $orig_dir
