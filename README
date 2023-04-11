@@ -5,10 +5,10 @@ Based on RobertCNelson's omap image builder.
 This should be run on an ARM system (I use an rpi 4), probably debian for best results.  
 
 Necessary packages: 
-	git 
-	debootstrap 
+  git 
+  debootstrap 
   m4
-  dosfstools 
+  dosfstools
   wget
   parted
   kpartx
@@ -18,17 +18,14 @@ Necessary packages:
 
 
 Basic procedure: 
-- set RNO_G_PASSWORD correctly 
-- sudo ./rno-g_image.sh # (once per image) 
+- set the environmental variable RNO_G_PASSWORD correctly 
+- sudo ./rno-g_image.sh # (once per image). This will take a long time, and produce the image with the latest version of rno-g software.
 - insert SD card
-- sudo ./rno-g_deploy /dev/sdX $station_number # (once per SD card, can do different station numbers in parallel in theory) 
+- sudo ./rno-g_deploy /dev/sdX $station_number # (once per SD card, can do different station numbers in parallel in theory). This will put the image on the SD card.
 
 The produced-SD card will autoflash the internal mmc on first boot with a
 basically identical version of itself (mounting /data from the sdcard). After
 that it will boot off mmc by default unless sysboot2 is low on startup. 
+This copying can date a while, you can see if it's done by checking if dd is running. 
 
-
-TODO:
-- figure out LTE networking (probably will be handled by rno-g-BBB-scripts make install) 
-- ??? 
 
