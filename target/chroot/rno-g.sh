@@ -171,7 +171,7 @@ install_rno_g_software () {
 
     if [ -f Makefile ] ; then 
       if [ "$gh_package" == "librno-g" ] ;  then
-        make daq && PREFIX=/rno-g make install-daq
+        make daq useful-test-progs  &&  PREFIX=/rno-g make install-daq
       elif [ "$gh_package" == "control-uC" ] ; then 
         cd loader && make 
       else 
