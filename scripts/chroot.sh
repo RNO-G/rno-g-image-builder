@@ -532,6 +532,17 @@ echo "image_type=${image_type}" >> /tmp/rcn-ee.conf
 sudo mv /tmp/rcn-ee.conf "${tempdir}/etc/rcn-ee.conf"
 sudo chown root:root "${tempdir}/etc/rcn-ee.conf"
 
+
+PUBKEY=""
+SECKEY=""
+
+if [ -f ${DIR}/key.pub ]  ; then
+PUBKEY=`cat ${DIR}/key.pub`
+fi 
+if [ -f ${DIR}/key.gpg ]  ; then
+SECKEY=`gpg --passphrase "${rfs_password}:${rfs_key_secret}"  --batch --quiet --yes -d ${DIR}/key.gpg`
+fi 
+
 #use /etc/dogtag for all:
 if [ ! "x${rfs_etc_dogtag}" = "x" ] ; then
 	sudo sh -c "echo '${rfs_etc_dogtag} ${time}' > '${tempdir}/etc/dogtag'"
@@ -933,6 +944,12 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 
 		mkdir -p /home/${rfs_username}/bin
 		chown ${rfs_username}:${rfs_username} /home/${rfs_username}/bin
+		
+		mkdir -p /home/${rfs_username}/.ssh 
+		echo "$PUBKEY" > /home/${rfs_username}/.ssh/key.pub
+		echo "$SECKEY" > /home/${rfs_username}/.ssh/key
+		chmod 0700 -R /home/${rfs_username}/.ssh
+		chown -R ${rfs_username}:${rfs_username} /home/${rfs_username}/.ssh
 
 		if [ ! "x${rfs_desktop_icon}" = "x" ] ; then
 			if [ -f /usr/share/applications/${rfs_desktop_icon} ] ; then
