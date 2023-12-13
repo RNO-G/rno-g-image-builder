@@ -150,13 +150,13 @@ setup_desktop () {
 
 	#Disable dpms mode and screen blanking
 	#Better fix for missing cursor
-	wfile="/home/${rfs_username}/.xsessionrc"
+	wfile="/home/${USER}/.xsessionrc"
 	echo "#!/bin/sh" > ${wfile}
 	echo "" >> ${wfile}
 	echo "xset -dpms" >> ${wfile}
 	echo "xset s off" >> ${wfile}
 	echo "xsetroot -cursor_name left_ptr" >> ${wfile}
-	chown -R ${rfs_username}:${rfs_username} ${wfile}
+	chown -R ${USER}:${USER} ${wfile}
 }
 
 
@@ -176,10 +176,15 @@ install_rno_g_software () {
 
   for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal flowerpy rnog_gps
   do
+    cd /home/rno-g
     git_repo="https://github.com/RNO-G/$gh_package"
     git_target_dir="/home/rno-g/$gh_package" 
     git_clone 
 
+   
+    echo "---------------------------------------------"
+    echo ${gh_package} ${gh_repo} ${git_target_dir}
+    echo "---------------------------------------------"
     cd ${git_target_dir} 
 
     if [ -f requirements.txt ] ; then 
@@ -192,17 +197,18 @@ install_rno_g_software () {
 
     if [ -f Makefile ] ; then 
       if [ "$gh_package" == "librno-g" ] ;  then
-        make daq useful-test-progs  &&  PREFIX=/rno-g make install-daq
+         make ON_BBB=yes daq  rno-g-utils daq-test-progs  install-daq
       elif [ "$gh_package" == "control-uC" ] ; then 
         cd loader && make 
+      elif [ "$gh_package" == "rno-g-ice-software" ] ; then 
+        PREFIX=/rno-g make install cfg-install service-install
       else 
-        make && PREFIX=/rno-g make install 
+        PREFIX=/rno-g make install
       fi
     fi 
 
 
-    chown -R rno-g ${git_target_dir}
-    chgrp -R rno-g ${git_target_dir}
+    chown -R rno-g:rno-g ${git_target_dir}
 
   done
 
@@ -336,6 +342,26 @@ install_git_repos () {
 
 }
 
+setup_git() {
+
+if [ -f /usr/bin/git ] ; then
+	git config --global user.email "cozzyd@kicp.uchicago.edu"
+	git config --global user.name "Cosmin Deaconu"
+	chown rno-g:rno-g /home/$USER/.gitconfig
+fi
+}
+
+setup_keys() { 
+
+pip3 install ssh-import-id
+for gh_user in cozzyd jakobhenrichs tikarg ejobe ryankrebs016 
+do
+ssh-import-id gh:$gh_user|| true
+done
+
+chown -R rno-g:rno-g /home/$USER/.ssh
+}
+
 other_source_links () {
 	rcn_https="https://rcn-ee.com/repos/git/u-boot-patches"
 
@@ -356,18 +382,15 @@ other_source_links () {
 is_this_qemu
 
 setup_system
-setup_desktop
+#setup_desktop
 
-if [ -f /usr/bin/git ] ; then
-	git config --global user.email "${rfs_username}@example.com"
-	git config --global user.name "${rfs_username}"
-	install_git_repos
-	git config --global user.email "cozzyd@kicp.uchicago.edu"
-	git config --global user.name "Cosmin Deaconu"
-  install_rno_g_software
-	git config --global --unset-all user.email
-	git config --global --unset-all user.name
-	chown ${rfs_username}:${rfs_username} /home/${rfs_username}/.gitconfig
-fi
+setup_git
+install_git_repos
+install_rno_g_software
+
+
+
+setup_keys
+
 other_source_links
 #
