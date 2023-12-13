@@ -20,7 +20,7 @@ HOSTNAME_SUFFIX=${1}
 sed -e "s/#PLACEHOLDER_PASSWORD#/$RNO_G_PASSWORD/" configs/rno-g.conf > configs/rno-g.tmp.conf
 echo "rfs_key_secret=\"$RNO_G_KEY_SECRET\"" >> configs/rno-g.tmp.conf 
 
-sudo ./RootStock-NG.sh -c rno-g.tmp.conf || exit 1 
+sudo ./RootStock-NG.sh -c rno-g.tmp.conf | tee image.log || exit 1 
 rm configs/rno-g.tmp.conf
 
 
