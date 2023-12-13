@@ -1041,16 +1041,6 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		echo "Log: (chroot): systemd_tweaks"
 		#We have systemd, so lets use it..
 
-		if [ -f /etc/systemd/systemd-journald.conf ] ; then
-			sed -i -e 's:#Storage=auto:Storage=persistent:g' /etc/systemd/systemd-journald.conf
-			sed -i -e 's:#SystemMaxUse=:SystemMaxUse=8M:g' /etc/systemd/systemd-journald.conf
-		fi
-
-		if [ -f /etc/systemd/journald.conf ] ; then
-			sed -i -e 's:#Storage=auto:Storage=persistent:g' /etc/systemd/journald.conf
-			sed -i -e 's:#SystemMaxUse=:SystemMaxUse=8M:g' /etc/systemd/journald.conf
-		fi
-
 		# make sure usb gadget works 
 		systemctl enable bb-usb-gadgets || true
 		systemctl enable systemd-networkd || true
