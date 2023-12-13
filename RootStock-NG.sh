@@ -154,8 +154,14 @@ run_roostock_ng () {
 		echo "tempdir=\"${tempdir}\"" >> ${DIR}/.project
 	fi
 
-	/bin/bash -e "${OIB_DIR}/scripts/install_dependencies.sh" || { exit 1 ; }
-	/bin/bash -e "${OIB_DIR}/scripts/debootstrap.sh" || { exit 1 ; }
+	if [ ! -f ${DIR}/.skip_bootstrap ]; then
+		/bin/bash -e "${OIB_DIR}/scripts/install_dependencies.sh" || { exit 1 ; }
+		/bin/bash -e "${OIB_DIR}/scripts/debootstrap.sh" || { exit 1 ; }
+		cp -r ${tempdir} ${DIR}/ignore/last_bootstrap
+	else 
+		cp -r ${DIR}/ignore/last_bootstrap ${tempdir} 
+
+	fi 
 	/bin/bash -e "${OIB_DIR}/scripts/chroot.sh" || { exit 1 ; }
 	sudo rm -rf ${tempdir}/ || true
 }
