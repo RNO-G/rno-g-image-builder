@@ -1051,6 +1051,9 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			sed -i -e 's:#SystemMaxUse=:SystemMaxUse=8M:g' /etc/systemd/journald.conf
 		fi
 
+		# make sure usb gadget works 
+		systemctl enable bb-usb-gadgets || true
+		systemctl enable systemd-networkd || true
 
 		#systemd v215: systemd-timesyncd.service replaces ntpdate
 		#enabled by default in v216 (not in jessie)
@@ -1070,10 +1073,6 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			fi
 		fi
 
-		#kill systemd/connman-wait-online.service, as it delays serial console upto 2 minutes...
-		if [ -f /etc/systemd/system/network-online.target.wants/connman-wait-online.service ] ; then
-			systemctl disable connman-wait-online.service || true
-		fi
 
 		#We manually start dnsmasq, usb0/SoftAp0 are not available till late in boot...
 		if [ -f /lib/systemd/system/dnsmasq.service ] ; then
@@ -1106,15 +1105,11 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			systemctl disable apt-daily-upgrade.timer || true
 		fi
 
-		#We use connman...
-		if [ -f /lib/systemd/system/systemd-networkd.service ] ; then
-			systemctl disable systemd-networkd.service || true
-		fi
 
 		#We use dnsmasq & connman...
-		if [ -f /lib/systemd/system/systemd-resolved.service ] ; then
-			systemctl disable systemd-resolved.service || true
-		fi
+#		if [ -f /lib/systemd/system/systemd-resolved.service ] ; then
+#			systemctl disable systemd-resolved.service || true
+#		fi
 
 		#Kill man-db
 		#debian@beaglebone:~$ sudo systemd-analyze blame | grep man-db.service

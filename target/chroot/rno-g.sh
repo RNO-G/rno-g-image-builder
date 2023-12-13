@@ -26,6 +26,16 @@ export LC_ALL=C
 u_boot_release="v2019.04"
 u_boot_release_x15="v2019.07-rc4"
 
+#contains: rfs_username, release_date
+if [ -f /etc/rcn-ee.conf ] ; then
+	. /etc/rcn-ee.conf
+fi
+
+if [ -f /etc/oib.project ] ; then
+	. /etc/oib.project
+fi
+
+
 
 export HOME=/home/${rfs_username}
 export USER=${rfs_username}
@@ -98,6 +108,17 @@ setup_system () {
 			cp -v /etc/alsa/tlv320aic3104.conf.txt /etc/asound.conf
 		fi
 	fi
+
+	echo "Setting up eth0"
+	# setup eth0 
+	echo "[Match]" >> /etc/systemd/network/eth0.network
+	echo "Name=eth0" >> /etc/systemd/network/eth0.network
+	echo "[Network]" >> /etc/systemd/network/eth0.network
+	echo "DHCP=ipv4" >> /etc/systemd/network/eth0.network
+
+	#disable dnsmasq? 
+	touch /etc/dnsmasq.d/.SoftAp0
+
 }
 
 setup_desktop () {

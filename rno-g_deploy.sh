@@ -37,7 +37,7 @@ orig_dir=`pwd`
 
 cd deploy/`cat latest_version` || exit 1 
 prog=./setup_sdcard.sh 
-args="--dtb beaglebone --hostname $hostname"
+args="--dtb beaglebone --enable-mainline-pru-rproc --hostname $hostname"
 
 
 if [ "$skip_sd" -eq "0" ] ; 
