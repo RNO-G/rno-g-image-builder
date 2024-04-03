@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# Copyright (c) 2014-2020 Robert Nelson <robertcnelson@gmail.com>
+# Copyright (c) 2014-2021 Robert Nelson <robertcnelson@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,9 +21,6 @@
 # THE SOFTWARE.
 
 export LC_ALL=C
-
-u_boot_release="v2019.04"
-u_boot_release_x15="v2019.07-rc4"
 
 #contains: rfs_username, release_date
 if [ -f /etc/rcn-ee.conf ] ; then
@@ -137,8 +134,6 @@ setup_desktop () {
 	wfile="/etc/lightdm/lightdm.conf"
 	if [ -f ${wfile} ] ; then
 		echo "Patching: ${wfile}"
-		sed -i -e 's:#autologin-user=:autologin-user='$rfs_username':g' ${wfile}
-		sed -i -e 's:#autologin-session=:autologin-session='$rfs_default_desktop':g' ${wfile}
 		if [ -f /opt/scripts/3rdparty/xinput_calibrator_pointercal.sh ] ; then
 			sed -i -e 's:#display-setup-script=:display-setup-script=/opt/scripts/3rdparty/xinput_calibrator_pointercal.sh:g' ${wfile}
 		fi
@@ -172,7 +167,6 @@ install_git_repos () {
 		if [ -f ${git_target_dir}/.git/config ] ; then
 			cd ${git_target_dir}/
 			sed -i -e 's:4.1.0:3.4.0:g' setup.py || true
-			sed -i -e "s/strict-aliasing/strict-aliasing', '-Wno-cast-function-type', '-Wno-format-truncation', '-Wno-sizeof-pointer-memaccess', '-Wno-stringop-overflow/g" setup.py || true
 			if [ -f /usr/bin/python3 ] ; then
 				python3 setup.py install || true
 			fi
@@ -224,19 +218,24 @@ install_git_repos () {
 		fi
 	fi
 
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
+	git_repo="https://openbeagle.org/beagleboard/BeagleBoard-DeviceTrees.git"
 	git_target_dir="/opt/source/dtb-4.14-ti"
 	git_branch="v4.14.x-ti"
 	git_clone_branch
 
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
+	git_repo="https://openbeagle.org/beagleboard/BeagleBoard-DeviceTrees.git"
 	git_target_dir="/opt/source/dtb-4.19-ti"
-	git_branch="v4.19.x-ti"
+	git_branch="v4.19.x-ti-overlays"
 	git_clone_branch
 
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
+	git_repo="https://openbeagle.org/beagleboard/BeagleBoard-DeviceTrees.git"
 	git_target_dir="/opt/source/dtb-5.4-ti"
-	git_branch="v5.4.x-ti"
+	git_branch="v5.4.x-ti-overlays"
+	git_clone_branch
+
+	git_repo="https://openbeagle.org/beagleboard/BeagleBoard-DeviceTrees.git"
+	git_target_dir="/opt/source/dtb-5.10-ti"
+	git_branch="v5.10.x-ti-unified"
 	git_clone_branch
 
 	git_repo="https://github.com/beagleboard/bb.org-overlays"
@@ -269,25 +268,23 @@ install_git_repos () {
 		fi
 	fi
 
+	git_repo="https://github.com/mvduin/bbb-pin-utils"
+	git_target_dir="/opt/source/bbb-pin-utils"
+	git_clone
+	if [ -d /opt/source/bbb-pin-utils/ ] ; then
+		ln -s /opt/source/bbb-pin-utils/show-pins /usr/local/sbin/
+	fi
+
 	git_repo="https://github.com/mvduin/py-uio"
 	git_target_dir="/opt/source/py-uio"
+	git_clone
+
+	git_repo="https://github.com/mvduin/overlay-utils"
+	git_target_dir="/opt/source/overlay-utils"
 	git_clone
 }
 
 other_source_links () {
-	rcn_https="https://rcn-ee.com/repos/git/u-boot-patches"
-
-	mkdir -p /opt/source/u-boot_${u_boot_release}/
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-omap3_beagle-uEnv.txt-bootz-n-fixes.patch
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-am335x_evm-uEnv.txt-bootz-n-fixes.patch
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0002-U-Boot-BeagleBone-Cape-Manager.patch
-	mkdir -p /opt/source/u-boot_${u_boot_release_x15}/
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release_x15}/" ${rcn_https}/${u_boot_release_x15}/0001-am57xx_evm-fixes.patch
-	rm /home/${rfs_username}/.wget-hsts || true
-
-	echo "u-boot_${u_boot_release} : /opt/source/u-boot_${u_boot_release}" >> /opt/source/list.txt
-	echo "u-boot_${u_boot_release_x15} : /opt/source/u-boot_${u_boot_release_x15}" >> /opt/source/list.txt
-
 	chown -R ${rfs_username}:${rfs_username} /opt/source/
 }
 

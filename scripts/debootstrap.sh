@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright (c) 2012-2016 Robert Nelson <robertcnelson@gmail.com>
+# Copyright (c) 2012-2020 Robert Nelson <robertcnelson@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,9 @@ check_defines () {
 		exit 1
 	else
 		options="--arch=${deb_arch}"
+		if [ "x${deb_arch}" = "xriscv64" ] ; then
+			options="${options} --no-check-gpg --no-check-certificate"
+		fi
 	fi
 
 	if [ "${deb_include}" ] ; then
@@ -50,7 +53,7 @@ check_defines () {
 		options="${options} --components=${components}"
 	fi
 
-	#http://linux.die.net/man/8/debootstrap
+	#https://manpages.debian.org/buster/debootstrap/debootstrap.8.en.html
 	if [ "${deb_variant}" ] ; then
 		#--variant=minbase|buildd|fakechroot|scratchbox
 		options="${options} --variant=${deb_variant}"
@@ -105,6 +108,9 @@ check_defines () {
 		case "${deb_distribution}" in
 		debian)
 			deb_mirror="deb.debian.org/debian"
+			#if [ "x${deb_arch}" = "xriscv64" ] ; then
+			#	deb_mirror="deb.debian.org/debian-ports"
+			#fi
 			;;
 		ubuntu)
 			deb_mirror="ports.ubuntu.com/"
@@ -127,8 +133,18 @@ if [ "${apt_proxy}" ] ; then
 fi
 
 echo "Log: Running: debootstrap in [${tempdir}]"
-###FIXME: --no-merged-usr eventually we will support, but as of 1.0.101+ it's back, so default to pre...
-echo "Log: [sudo debootstrap --no-merged-usr ${options} ${suite} ${target} ${mirror}]"
-sudo debootstrap --no-merged-usr ${options} ${suite} "${target}" ${mirror}
+
+case "${deb_codename}" in
+bookworm|trixie|sid|jammy|lunar|mantic)
+	echo "Log: [sudo debootstrap ${options} ${suite} ${target} ${mirror}]"
+	sudo debootstrap ${options} ${suite} "${target}" ${mirror}
+	;;
+*)
+	###FIXME: --no-merged-usr eventually we will support, but as of 1.0.101+ it's back, so default to pre...
+	echo "Log: [sudo debootstrap --no-merged-usr ${options} ${suite} ${target} ${mirror}]"
+	sudo debootstrap --no-merged-usr ${options} ${suite} "${target}" ${mirror}
+	;;
+esac
+
 report_size
 #

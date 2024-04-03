@@ -6,3 +6,4 @@ git/
 release
 .project
 id-rsa*
+.DS_Store

@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# Copyright (c) 2014-2019 Robert Nelson <robertcnelson@gmail.com>
+# Copyright (c) 2014-2021 Robert Nelson <robertcnelson@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -95,55 +95,47 @@ install_git_repos () {
 		git_clone
 		if [ -f ${git_target_dir}/.git/config ] ; then
 			cd ${git_target_dir}/
-			sed -i -e 's:4.1.0:3.4.0:g' setup.py
-			if [ -f /usr/bin/python2 ] ; then
-				python2 setup.py install || true
-			fi
+			sed -i -e 's:4.1.0:3.4.0:g' setup.py || true
+			sed -i -e "s/strict-aliasing/strict-aliasing', '-Wno-cast-function-type', '-Wno-format-truncation', '-Wno-sizeof-pointer-memaccess', '-Wno-stringop-overflow/g" setup.py || true
 			if [ -f /usr/bin/python3 ] ; then
 				python3 setup.py install || true
 			fi
+			git reset HEAD --hard || true
 		fi
 	fi
 
-	git_repo="https://github.com/strahlex/BBIOConfig.git"
-	git_target_dir="/opt/source/BBIOConfig"
-	git_clone
-
 	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-4.14-ti"
-	git_branch="v4.14.x-ti"
+	git_target_dir="/opt/source/dtb-5.10-ti"
+	git_branch="v5.10.x-ti"
 	git_clone_branch
 
 	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-4.19-ti"
-	git_branch="v4.19.x-ti"
-	git_clone_branch
-
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-5.4-ti"
-	git_branch="v5.4.x-ti"
-	git_clone_branch
-
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-5.4"
-	git_branch="v5.4.x"
+	git_target_dir="/opt/source/dtb-5.15"
+	git_branch="v5.15.x"
 	git_clone_branch
 
 	git_repo="https://github.com/beagleboard/bb.org-overlays"
 	git_target_dir="/opt/source/bb.org-overlays"
 	git_clone
 
-	git_repo="https://github.com/mcdeoliveira/rcpy"
-	git_target_dir="/opt/source/rcpy"
+	git_repo="https://github.com/mvduin/bbb-pin-utils"
+	git_target_dir="/opt/source/bbb-pin-utils"
 	git_clone
-
-	git_repo="https://github.com/mcdeoliveira/pyctrl"
-	git_target_dir="/opt/source/pyctrl"
-	git_clone
+	if [ -d /opt/source/bbb-pin-utils/ ] ; then
+		ln -s /opt/source/bbb-pin-utils/show-pins /usr/local/sbin/
+	fi
 
 	git_repo="https://github.com/mvduin/py-uio"
 	git_target_dir="/opt/source/py-uio"
 	git_clone
+
+	git_repo="https://github.com/mvduin/overlay-utils"
+	git_target_dir="/opt/source/overlay-utils"
+	git_clone
+}
+
+other_source_links () {
+	chown -R ${rfs_username}:${rfs_username} /opt/source/
 }
 
 is_this_qemu
@@ -159,7 +151,5 @@ if [ -f /usr/bin/git ] ; then
 	git config --global --unset-all user.name
 	chown ${rfs_username}:${rfs_username} /home/${rfs_username}/.gitconfig
 fi
-#install_build_pkgs
 #other_source_links
-#unsecure_root
-#todo
+#

@@ -1,6 +1,6 @@
 #!/bin/bash -ex
 #
-# Copyright (c) 2012-2019 Robert Nelson <robertcnelson@gmail.com>
+# Copyright (c) 2012-2024 Robert Nelson <robertcnelson@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,13 +26,17 @@ time=$(date +%Y-%m-%d)
 OIB_DIR="$(dirname "$( cd "$(dirname "$0")" ; pwd -P )" )"
 chroot_completed="false"
 
-abi=ac
+abi=ad
 
 #ac=change /sys/kernel/debug mount persmissions
 #ab=efi added 20180321
 #aa
 
 . "${DIR}/.project"
+
+if [ -f "${DIR}/.notar" ] ; then
+	unset chroot_tarball
+fi
 
 check_defines () {
 	if [ ! "${tempdir}" ] ; then
@@ -140,16 +144,35 @@ check_defines () {
 
 	if [ "x${repo_rcnee}" = "xenable" ] ; then
 		if [ ! "x${repo_rcnee_pkg_list}" = "x" ] ; then
-			include=$(echo ${repo_rcnee_pkg_list} | sed 's/,/ /g' | sed 's/\t/,/g')
-			deb_additional_pkgs="${deb_additional_pkgs} ${include}"
+			repo_rcnee_pkg_list=$(echo ${repo_rcnee_pkg_list} | sed 's/,/ /g' | sed 's/\t/,/g')
 		fi
 
 		if [ "x${repo_rcnee_sgx}" = "xenable" ] ; then
 			if [ ! "x${repo_rcnee_sgx_pkg_list}" = "x" ] ; then
 				include=$(echo ${repo_rcnee_sgx_pkg_list} | sed 's/,/ /g' | sed 's/\t/,/g')
-				deb_additional_pkgs="${deb_additional_pkgs} ${include}"
+				repo_rcnee_pkg_list="${repo_rcnee_pkg_list} ${include}"
 			fi
 		fi
+	fi
+
+	if [ ! "x${deb_console_application_pkgs}" = "x" ] ; then
+		deb_console_application_pkgs="$(echo ${deb_console_application_pkgs} | sed 's/,/ /g' | sed 's/\t/,/g')"
+	fi
+
+	if [ ! "x${deb_desktop_prerequisite_pkgs}" = "x" ] ; then
+		deb_desktop_common_pkgs="$(echo ${deb_desktop_common_pkgs} | sed 's/,/ /g' | sed 's/\t/,/g')"
+	fi
+
+	if [ ! "x${deb_desktop_pkgs}" = "x" ] ; then
+		deb_desktop_pkgs="$(echo ${deb_desktop_pkgs} | sed 's/,/ /g' | sed 's/\t/,/g')"
+	fi
+
+	if [ ! "x${deb_desktop_application_pkgs}" = "x" ] ; then
+		deb_desktop_application_pkgs="$(echo ${deb_desktop_application_pkgs} | sed 's/,/ /g' | sed 's/\t/,/g')"
+	fi
+
+	if [ ! "x${deb_purge_pkgs}" = "x" ] ; then
+		deb_purge_pkgs="$(echo ${deb_purge_pkgs} | sed 's/,/ /g' | sed 's/\t/,/g')"
 	fi
 }
 
@@ -245,15 +268,25 @@ check_defines
 
 if [ "x${host_arch}" != "xarmv7l" ] && [ "x${host_arch}" != "xaarch64" ] ; then
 	if [ "x${deb_arch}" = "xarmel" ] || [ "x${deb_arch}" = "xarmhf" ] ; then
-		sudo cp $(which qemu-arm-static) "${tempdir}/usr/bin/"
+		echo "sudo cp -v $(which qemu-arm-static) \"${tempdir}/usr/bin/\""
+		sudo cp -v $(which qemu-arm-static) "${tempdir}/usr/bin/"
 	fi
 	if [ "x${deb_arch}" = "xarm64" ] ; then
-		sudo cp $(which qemu-aarch64-static) "${tempdir}/usr/bin/"
+		echo "sudo cp -v $(which qemu-aarch64-static) \"${tempdir}/usr/bin/\""
+		sudo cp -v $(which qemu-aarch64-static) "${tempdir}/usr/bin/"
+	fi
+fi
+
+if [ "x${host_arch}" != "xriscv64" ] ; then
+	if [ "x${deb_arch}" = "xriscv64" ] ; then
+		echo "sudo cp -v $(which qemu-riscv64-static) \"${tempdir}/usr/bin/\""
+		sudo cp -v $(which qemu-riscv64-static) "${tempdir}/usr/bin/"
 	fi
 fi
 
 chroot_mount_run
 echo "Log: Running: debootstrap second-stage in [${tempdir}]"
+echo "Log: [sudo chroot "${tempdir}" debootstrap/debootstrap --second-stage]"
 sudo chroot "${tempdir}" debootstrap/debootstrap --second-stage
 echo "Log: Complete: [sudo chroot ${tempdir} debootstrap/debootstrap --second-stage]"
 report_size
@@ -281,6 +314,7 @@ if [ "x${chroot_very_small_image}" = "xenable" ] ; then
 	echo "" >> /tmp/01_nodoc
 
 	sudo mv /tmp/01_nodoc "${tempdir}/etc/dpkg/dpkg.cfg.d/01_nodoc"
+	sudo chown root:root "${tempdir}/etc/dpkg/dpkg.cfg.d/01_nodoc"
 
 	sudo mkdir -p "${tempdir}/etc/apt/apt.conf.d/" || true
 
@@ -290,10 +324,12 @@ if [ "x${chroot_very_small_image}" = "xenable" ] ; then
 	echo "  pkgcache \"\";" >> /tmp/02nocache
 	echo "}" >> /tmp/02nocache
 	sudo mv  /tmp/02nocache "${tempdir}/etc/apt/apt.conf.d/02nocache"
+	sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02nocache"
 
 	#apt: drop translations...
 	echo "Acquire::Languages \"none\";" > /tmp/02translations
 	sudo mv /tmp/02translations "${tempdir}/etc/apt/apt.conf.d/02translations"
+	sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02translations"
 
 	echo "Log: after locale/man purge"
 	report_size
@@ -310,45 +346,90 @@ echo "path-exclude=/etc/kernel/postrm.d/zz-flash-kernel" >> /tmp/01_noflash_kern
 echo ""  >> /tmp/01_noflash_kernel
 
 sudo mv /tmp/01_noflash_kernel "${tempdir}/etc/dpkg/dpkg.cfg.d/01_noflash_kernel"
+sudo chown root:root "${tempdir}/etc/dpkg/dpkg.cfg.d/01_noflash_kernel"
 
 sudo mkdir -p "${tempdir}/usr/share/flash-kernel/db/" || true
 sudo cp -v "${OIB_DIR}/target/other/rcn-ee.db" "${tempdir}/usr/share/flash-kernel/db/"
 
+if [ "x${host_arch}" != "xriscv64" ] ; then
+	case "${deb_distribution}" in
+	ubuntu)
+		echo "# neuter flash-kernel" > /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/amdgpu/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/dpaa2/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/i915/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/intel/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/iwlwifi-*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/liquidio/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/mellanox/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/mrvl/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/netronome/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/nvidia/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/qcom/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/qed/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/radeon/*" >> /tmp/01_ubuntu_big_firmware
+		echo "path-exclude=/usr/lib/firmware/vsc/*" >> /tmp/01_ubuntu_big_firmware
+		echo ""  >> /tmp/01_ubuntu_big_firmware
+
+		sudo mv /tmp/01_ubuntu_big_firmware "${tempdir}/etc/dpkg/dpkg.cfg.d/01_ubuntu_big_firmware"
+		sudo chown root:root "${tempdir}/etc/dpkg/dpkg.cfg.d/01_ubuntu_big_firmware"
+
+		;;
+	esac
+fi
+
 #generic apt.conf tweaks for flash/mmc devices to save on wasted space...
 sudo mkdir -p "${tempdir}/etc/apt/apt.conf.d/" || true
 
-#apt: emulate apt-get clean:
-echo '#Custom apt-get clean' > /tmp/02apt-get-clean
-echo 'DPkg::Post-Invoke { "rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb || true"; };' >> /tmp/02apt-get-clean
-echo 'APT::Update::Post-Invoke { "rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb || true"; };' >> /tmp/02apt-get-clean
-sudo mv /tmp/02apt-get-clean "${tempdir}/etc/apt/apt.conf.d/02apt-get-clean"
+if [ "x${chroot_very_small_image}" = "xenable" ] ; then
+	#apt: emulate apt-get clean:
+	echo '#Custom apt-get clean' > /tmp/02apt-get-clean
+	echo 'DPkg::Post-Invoke { "rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb || true"; };' >> /tmp/02apt-get-clean
+	echo 'APT::Update::Post-Invoke { "rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb || true"; };' >> /tmp/02apt-get-clean
+	sudo mv /tmp/02apt-get-clean "${tempdir}/etc/apt/apt.conf.d/02apt-get-clean"
+	sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02apt-get-clean"
+fi
 
 #apt: drop translations
 echo 'Acquire::Languages "none";' > /tmp/02-no-languages
 sudo mv /tmp/02-no-languages "${tempdir}/etc/apt/apt.conf.d/02-no-languages"
+sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02-no-languages"
 
-if [ "x${deb_distribution}" = "xdebian" ] ; then
-	#apt: /var/lib/apt/lists/, store compressed only
-	case "${deb_codename}" in
-	stretch|buster)
-		echo 'Acquire::GzipIndexes "true"; APT::Compressor::xz::Cost "40";' > /tmp/02compress-indexes
-		sudo mv /tmp/02compress-indexes "${tempdir}/etc/apt/apt.conf.d/02compress-indexes"
-		;;
-	sid)
-		###FIXME: close to release switch to ^ xz, right now <next> is slow on apt...
-		echo 'Acquire::GzipIndexes "true"; APT::Compressor::gzip::Cost "40";' > /tmp/02compress-indexes
-		sudo mv /tmp/02compress-indexes "${tempdir}/etc/apt/apt.conf.d/02compress-indexes"
-		;;
-	esac
+#apt: no PDiffs..
+echo 'Acquire::PDiffs "0";' > /tmp/02-no-pdiffs
+sudo mv /tmp/02-no-pdiffs "${tempdir}/etc/apt/apt.conf.d/02-no-pdiffs"
+sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02-no-pdiffs"
 
+#apt: disable Progress-Fancy (apt and tio/serial terminal gets messed up)
+echo 'Dpkg::Progress-Fancy "0";' > /tmp/99progressbar
+sudo mv /tmp/99progressbar "${tempdir}/etc/apt/apt.conf.d/99progressbar"
+sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/99progressbar"
+
+if [ "x${chroot_very_small_image}" = "xenable" ] ; then
+	if [ "x${deb_distribution}" = "xdebian" ] ; then
+		#apt: /var/lib/apt/lists/, store compressed only
+		case "${deb_codename}" in
+		stretch|buster)
+			echo 'Acquire::GzipIndexes "true"; APT::Compressor::xz::Cost "40";' > /tmp/02compress-indexes
+			sudo mv /tmp/02compress-indexes "${tempdir}/etc/apt/apt.conf.d/02compress-indexes"
+			sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02compress-indexes"
+			;;
+		bullseye|bookworm|sid)
+			###FIXME: close to release switch to ^ xz, right now <next> is slow on apt...
+			echo 'Acquire::GzipIndexes "true"; APT::Compressor::gzip::Cost "40";' > /tmp/02compress-indexes
+			sudo mv /tmp/02compress-indexes "${tempdir}/etc/apt/apt.conf.d/02compress-indexes"
+			sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/02compress-indexes"
+			;;
+		esac
+	fi
+fi
+
+if [ "x${deb_distribution}" = "xdebian" ] || [ "x${deb_distribution}" = "xubuntu" ] ; then
 	if [ "${apt_proxy}" ] ; then
-		#apt: make sure apt-cacher-ng doesn't break oracle-java8-installer
-		echo 'Acquire::http::Proxy::download.oracle.com "DIRECT";' > /tmp/03-proxy-oracle
-		sudo mv /tmp/03-proxy-oracle "${tempdir}/etc/apt/apt.conf.d/03-proxy-oracle"
-
 		#apt: make sure apt-cacher-ng doesn't break https repos
-		echo 'Acquire::http::Proxy::deb.nodesource.com "DIRECT";' > /tmp/03-proxy-https
+		echo 'Acquire::https::Proxy::debian.beagle.cc "DIRECT";' > /tmp/03-proxy-https
 		sudo mv /tmp/03-proxy-https "${tempdir}/etc/apt/apt.conf.d/03-proxy-https"
+		sudo chown root:root "${tempdir}/etc/apt/apt.conf.d/03-proxy-https"
 	fi
 fi
 
@@ -360,30 +441,87 @@ echo "deb http://${deb_mirror} ${deb_codename} ${deb_components}" > ${wfile}
 echo "#deb-src http://${deb_mirror} ${deb_codename} ${deb_components}" >> ${wfile}
 echo "" >> ${wfile}
 
-#https://wiki.debian.org/StableUpdates
+if [ "x${enable_repo_debian_unstable}" = "xenable" ] ; then
+	echo "deb http://${deb_mirror} unstable ${deb_components}" >> ${wfile}
+	echo "#deb-src http://${deb_mirror} unstable ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+fi
+
+if [ "x${enable_repo_debian_unreleased}" = "xenable" ] ; then
+	echo "deb http://${deb_mirror} unreleased ${deb_components}" >> ${wfile}
+	echo "#deb-src http://${deb_mirror} unreleased ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+fi
+
+if [ "x${enable_repo_debian_experimental}" = "xenable" ] ; then
+	echo "deb http://${deb_mirror} experimental ${deb_components}" >> ${wfile}
+	echo "#deb-src http://${deb_mirror} experimental ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+fi
+
+#Q) What should I use in sources.list for bullseye?
+#There is a change in the security repository compared to prior releases.
+#deb http://deb.debian.org/debian bullseye main
+#deb http://security.debian.org/debian-security bullseye-security main
+#deb http://deb.debian.org/debian bullseye-updates main
+
+#https://wiki.debian.org/LTS/Using
 case "${deb_codename}" in
-sid)
-	echo "#deb http://${deb_mirror} ${deb_codename}-updates ${deb_components}" >> ${wfile}
-	echo "##deb-src http://${deb_mirror} ${deb_codename}-updates ${deb_components}" >> ${wfile}
+stretch)
+	echo "deb http://archive.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
+	echo "#deb-src http://archive.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
 	echo "" >> ${wfile}
 	;;
-*)
-	echo "deb http://${deb_mirror} ${deb_codename}-updates ${deb_components}" >> ${wfile}
-	echo "#deb-src http://${deb_mirror} ${deb_codename}-updates ${deb_components}" >> ${wfile}
+buster)
+	echo "deb http://security.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
+	echo "#deb-src http://security.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+	;;
+bullseye|bookworm)
+	echo "deb http://security.debian.org/debian-security ${deb_codename}-security ${deb_components}" >> ${wfile}
+	echo "#deb-src http://security.debian.org/debian-security ${deb_codename}-security ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+	;;
+sid)
+	echo "#deb http://security.debian.org/debian-security ${deb_codename}-security ${deb_components}" >> ${wfile}
+	echo "##deb-src http://security.debian.org/debian-security ${deb_codename}-security ${deb_components}" >> ${wfile}
 	echo "" >> ${wfile}
 	;;
 esac
 
-#https://wiki.debian.org/LTS/Using
+#Ubuntu ports updates: http://ports.ubuntu.com/dists/focal-security/
 case "${deb_codename}" in
-stretch|buster)
-	echo "deb http://deb.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
-	echo "#deb-src http://deb.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
+bionic|focal|jammy|lunar|mantic)
+	echo "deb http://ports.ubuntu.com/ ${deb_codename}-security ${deb_components}" >> ${wfile}
+	echo "#deb-src http://ports.ubuntu.com/ ${deb_codename}-security ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+	;;
+esac
+
+#https://wiki.debian.org/StableUpdates
+case "${deb_codename}" in
+stretch)
+	echo "deb http://archive.debian.org/debian ${deb_codename}-updates ${deb_components}" >> ${wfile}
+	echo "#deb-src http://archive.debian.org/debian ${deb_codename}-updates ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+	;;
+buster|bullseye|bookworm)
+	echo "deb http://deb.debian.org/debian ${deb_codename}-updates ${deb_components}" >> ${wfile}
+	echo "#deb-src http://deb.debian.org/debian ${deb_codename}-updates ${deb_components}" >> ${wfile}
 	echo "" >> ${wfile}
 	;;
 sid)
-	echo "#deb http://deb.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
-	echo "##deb-src http://deb.debian.org/debian-security ${deb_codename}/updates ${deb_components}" >> ${wfile}
+	echo "#deb http://deb.debian.org/debian ${deb_codename}-updates ${deb_components}" >> ${wfile}
+	echo "##deb-src http://deb.debian.org/debian ${deb_codename}-updates ${deb_components}" >> ${wfile}
+	echo "" >> ${wfile}
+	;;
+esac
+
+#Ubuntu ports updates: http://ports.ubuntu.com/dists/focal-updates/
+case "${deb_codename}" in
+bionic|focal|jammy|lunar|mantic)
+	echo "deb http://ports.ubuntu.com/ ${deb_codename}-updates ${deb_components}" >> ${wfile}
+	echo "#deb-src http://ports.ubuntu.com/ ${deb_codename}-updates ${deb_components}" >> ${wfile}
 	echo "" >> ${wfile}
 	;;
 esac
@@ -391,7 +529,12 @@ esac
 #https://wiki.debian.org/Backports
 if [ "x${chroot_enable_debian_backports}" = "xenable" ] ; then
 	case "${deb_codename}" in
-	stretch|buster)
+	stretch)
+		echo "deb http://archive.debian.org/debian ${deb_codename}-backports ${deb_components}" >> ${wfile}
+		echo "#deb-src http://archive.debian.org/debian ${deb_codename}-backports ${deb_components}" >> ${wfile}
+		echo "" >> ${wfile}
+		;;
+	buster|bullseye|bookworm)
 		echo "deb http://deb.debian.org/debian ${deb_codename}-backports ${deb_components}" >> ${wfile}
 		echo "#deb-src http://deb.debian.org/debian ${deb_codename}-backports ${deb_components}" >> ${wfile}
 		echo "" >> ${wfile}
@@ -400,9 +543,9 @@ if [ "x${chroot_enable_debian_backports}" = "xenable" ] ; then
 fi
 
 if [ "x${repo_external}" = "xenable" ] ; then
-	echo "" >> ${wfile}
 	echo "deb [arch=${repo_external_arch}] ${repo_external_server} ${repo_external_dist} ${repo_external_components}" >> ${wfile}
 	echo "#deb-src [arch=${repo_external_arch}] ${repo_external_server} ${repo_external_dist} ${repo_external_components}" >> ${wfile}
+	echo "" >> ${wfile}
 fi
 
 if [ "x${repo_flat}" = "xenable" ] ; then
@@ -410,49 +553,91 @@ if [ "x${repo_flat}" = "xenable" ] ; then
 	for component in "${repo_flat_components[@]}" ; do
 		echo "deb ${repo_flat_server} ${component}" >> ${wfile}
 		echo "#deb-src ${repo_flat_server} ${component}" >> ${wfile}
+		echo "" >> ${wfile}
 	done
 fi
 
-if [ ! "x${repo_nodesource}" = "x" ] ; then
-	echo "" >> ${wfile}
-	echo "deb https://deb.nodesource.com/${repo_nodesource} ${repo_nodesource_dist} main" >> ${wfile}
-	echo "#deb-src https://deb.nodesource.com/${repo_nodesource} ${repo_nodesource_dist} main" >> ${wfile}
-	echo "" >> ${wfile}
-	sudo cp -v "${OIB_DIR}/target/keyring/nodesource.gpg.key" "${tempdir}/tmp/nodesource.gpg.key"
-fi
-
 if [ "x${repo_azulsystems}" = "xenable" ] ; then
-	echo "" >> ${wfile}
 	echo "deb http://repos.azulsystems.com/${deb_distribution} stable main" >> ${wfile}
 	echo "" >> ${wfile}
 	sudo cp -v "${OIB_DIR}/target/keyring/repos.azulsystems.com.pubkey.asc" "${tempdir}/tmp/repos.azulsystems.com.pubkey.asc"
 fi
 
-if [ "x${repo_rcnee}" = "xenable" ] ; then
-	#no: precise
+if [ "x${repo_ros}" = "xenable" ] ; then
+	repo_ros_arch=${repo_ros_arch:-"armhf"}
+	echo "deb [arch=${repo_ros_arch}] http://packages.ros.org/ros/${deb_distribution} ${deb_codename} main" >> ${wfile}
+	echo "#deb-src [arch=${repo_ros_arch}] http://packages.ros.org/ros/${deb_distribution} ${deb_codename} main" >> ${wfile}
 	echo "" >> ${wfile}
+	sudo cp -v "${OIB_DIR}/target/keyring/ros-archive-keyring.asc" "${tempdir}/tmp/ros-archive-keyring.asc"
+fi
+
+if [ "x${repo_ros}" = "xros2" ] ; then
+	echo "deb [arch=${repo_ros_arch} signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu ${repo_ros_dist} main" >> ${wfile}
+	echo "#deb-src [arch=${repo_ros_arch} signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu ${repo_ros_dist} main" >> ${wfile}
+	echo "" >> ${wfile}
+	sudo cp -v "${OIB_DIR}/target/keyring/ros-archive-keyring.gpg" "${tempdir}/usr/share/keyrings/ros-archive-keyring.gpg"
+fi
+
+if [ -f /tmp/sources.list ] ; then
+	sudo mv /tmp/sources.list "${tempdir}/etc/apt/sources.list"
+	sudo chown root:root "${tempdir}/etc/apt/sources.list"
+fi
+
+wfile="/tmp/beagle.list"
+if [ "x${repo_rcnee}" = "xenable" ] ; then
+	rcnee_keyring="/usr/share/keyrings/rcn-ee-archive-keyring.gpg"
+	repo_rcnee_arch=${repo_rcnee_arch:-"armhf"}
+	repo_rcnee_mirror=${repo_rcnee_mirror:-"repos.rcn-ee.com"}
+
+	#adding two new archives arm64, riscv64...
+	if [ "x${repo_rcnee_arch}" = "xarmhf" ] ; then
+		#armhf -> debian
+		rcnee_url_directory="${deb_distribution}"
+	else
+		#arm64 -> debian-arm64, riscv64 -> debian-riscv64
+		rcnee_url_directory="${deb_distribution}-${repo_rcnee_arch}"
+		rcnee_url_directory_mirror="${deb_distribution}-${repo_rcnee_arch}"
+		###amazon+cloudflare
+		if [ "x${repo_rcnee_mirror}" = "xdebian.beagleboard.org" ] ; then
+			rcnee_url_directory="${repo_rcnee_arch}"
+		fi
+	fi
+
 	echo "#Kernel source (repos.rcn-ee.com) : https://github.com/RobertCNelson/linux-stable-rcn-ee" >> ${wfile}
 	echo "#" >> ${wfile}
 	echo "#git clone https://github.com/RobertCNelson/linux-stable-rcn-ee" >> ${wfile}
 	echo "#cd ./linux-stable-rcn-ee" >> ${wfile}
 	echo "#git checkout \`uname -r\` -b tmp" >> ${wfile}
-	echo "#" >> ${wfile}
-	echo "deb [arch=armhf] http://repos.rcn-ee.com/${deb_distribution}/ ${deb_codename} main" >> ${wfile}
-	echo "#deb-src [arch=armhf] http://repos.rcn-ee.com/${deb_distribution}/ ${deb_codename} main" >> ${wfile}
-
-	sudo cp -v "${OIB_DIR}/target/keyring/repos.rcn-ee.net-archive-keyring.asc" "${tempdir}/tmp/repos.rcn-ee.net-archive-keyring.asc"
-fi
-
-if [ "x${repo_ros}" = "xenable" ] ; then
 	echo "" >> ${wfile}
-	echo "deb [arch=armhf] http://packages.ros.org/ros/${deb_distribution} ${deb_codename} main" >> ${wfile}
-	echo "#deb-src [arch=armhf] http://packages.ros.org/ros/${deb_distribution} ${deb_codename} main" >> ${wfile}
-
-	sudo cp -v "${OIB_DIR}/target/keyring/ros-archive-keyring.asc" "${tempdir}/tmp/ros-archive-keyring.asc"
+	if [ "x${repo_rcnee_arch}" = "xarmhf" ] ; then
+		echo "deb [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://${repo_rcnee_mirror}/${rcnee_url_directory}/ ${deb_codename} main" >> ${wfile}
+		echo "#deb-src [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://${repo_rcnee_mirror}/${rcnee_url_directory}/ ${deb_codename} main" >> ${wfile}
+	else
+		if [ "x${repo_rcnee_mirror}" = "xdebian.beagleboard.org" ] ; then
+			#use local mirror when building...
+			echo "#BeagleBoard.org Mirror on Cloudflare" >> ${wfile}
+			echo "deb [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://${repo_rcnee_mirror}/${rcnee_url_directory}/ ${deb_codename} main" >> ${wfile}
+			echo "#deb-src [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://${repo_rcnee_mirror}/${rcnee_url_directory}/ ${deb_codename} main" >> ${wfile}
+			echo "" >> ${wfile}
+			echo "#Backup Mirror" >> ${wfile}
+			if [ "x${repo_rcnee_arch}" = "xriscv64" ] || [ "x${repo_rcnee_arch}" = "xarm64" ] ; then
+				echo "deb [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://repos.rcn-ee.com/debian-${repo_rcnee_arch}/ ${deb_codename} main" >> ${wfile}
+				echo "#deb-src [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://repos.rcn-ee.com/debian-${repo_rcnee_arch}/ ${deb_codename} main" >> ${wfile}
+			else
+				echo "deb [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://repos.rcn-ee.com/${rcnee_url_directory_mirror}/ ${deb_codename} main" >> ${wfile}
+				echo "#deb-src [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://repos.rcn-ee.com/${rcnee_url_directory_mirror}/ ${deb_codename} main" >> ${wfile}
+			fi
+		else
+			echo "deb [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://${repo_rcnee_mirror}/${rcnee_url_directory}/ ${deb_codename} main" >> ${wfile}
+			echo "#deb-src [arch=${repo_rcnee_arch} signed-by=${rcnee_keyring}] http://${repo_rcnee_mirror}/${rcnee_url_directory}/ ${deb_codename} main" >> ${wfile}
+		fi
+	fi
+	sudo cp -v "${OIB_DIR}/target/keyring/rcn-ee-archive-keyring.gpg" "${tempdir}${rcnee_keyring}"
 fi
 
-if [ -f /tmp/sources.list ] ; then
-	sudo mv /tmp/sources.list "${tempdir}/etc/apt/sources.list"
+if [ -f /tmp/beagle.list ] ; then
+	sudo mv /tmp/beagle.list "${tempdir}/etc/apt/sources.list.d/beagle.list"
+	sudo chown root:root "${tempdir}/etc/apt/sources.list.d/beagle.list"
 fi
 
 if [ "x${repo_external}" = "xenable" ] ; then
@@ -469,16 +654,18 @@ fi
 
 if [ "${apt_proxy}" ] ; then
 	echo "Acquire::http::Proxy \"http://${apt_proxy}\";" > /tmp/apt.conf
+	echo "Acquire::https::Proxy \"false\";" >> /tmp/apt.conf
 	sudo mv /tmp/apt.conf "${tempdir}/etc/apt/apt.conf"
+	sudo chown root:root "${tempdir}/etc/apt/apt.conf"
 fi
 
 echo "127.0.0.1	localhost" > /tmp/hosts
 echo "127.0.1.1	${rfs_hostname}.localdomain	${rfs_hostname}" >> /tmp/hosts
 echo "" >> /tmp/hosts
 echo "# The following lines are desirable for IPv6 capable hosts" >> /tmp/hosts
-echo "::1     localhost ip6-localhost ip6-loopback" >> /tmp/hosts
-echo "ff02::1 ip6-allnodes" >> /tmp/hosts
-echo "ff02::2 ip6-allrouters" >> /tmp/hosts
+echo "::1		localhost ip6-localhost ip6-loopback" >> /tmp/hosts
+echo "ff02::1		ip6-allnodes" >> /tmp/hosts
+echo "ff02::2		ip6-allrouters" >> /tmp/hosts
 sudo mv /tmp/hosts "${tempdir}/etc/hosts"
 sudo chown root:root "${tempdir}/etc/hosts"
 
@@ -486,39 +673,19 @@ echo "${rfs_hostname}" > /tmp/hostname
 sudo mv /tmp/hostname "${tempdir}/etc/hostname"
 sudo chown root:root "${tempdir}/etc/hostname"
 
-if [ "x${deb_arch}" = "xarmhf" ] ; then
-	case "${deb_distribution}" in
-	debian)
-		case "${deb_codename}" in
-		stretch|buster)
-			#while bb-customizations installes "generic-board-startup.service" other boards/configs could use this default.
-			sudo cp "${OIB_DIR}/target/init_scripts/systemd-generic-board-startup.service" "${tempdir}/lib/systemd/system/generic-board-startup.service"
-			sudo chown root:root "${tempdir}/lib/systemd/system/generic-board-startup.service"
+case "${deb_distribution}" in
+debian)
+	distro="Debian"
+	;;
+ubuntu)
+	distro="Ubuntu"
+	;;
+esac
 
-			sudo cp "${OIB_DIR}/target/init_scripts/auto-flash-emmc-if-image.service" "${tempdir}/lib/systemd/system/"
-			sudo chown root:root "${tempdir}/lib/systemd/system/auto-flash-emmc-if-image.service"
-	
-			distro="Debian"
-			;;
-		esac
-		;;
-	ubuntu)
-		case "${deb_codename}" in
-		bionic|focal)
-			#while bb-customizations installes "generic-board-startup.service" other boards/configs could use this default.
-			sudo cp "${OIB_DIR}/target/init_scripts/systemd-generic-board-startup.service" "${tempdir}/lib/systemd/system/generic-board-startup.service"
-			sudo chown root:root "${tempdir}/lib/systemd/system/generic-board-startup.service"
-			distro="Ubuntu"
-			;;
-		esac
-		;;
-	esac
-fi
-
-if [ "x${deb_arch}" = "xarmel" ] ; then
+if [ "x${rfs_startup_scripts}" = "xenable" ] ; then
+	#while bb-customizations installes "generic-board-startup.service" other boards/configs could use this default.
 	sudo cp "${OIB_DIR}/target/init_scripts/systemd-generic-board-startup.service" "${tempdir}/lib/systemd/system/generic-board-startup.service"
 	sudo chown root:root "${tempdir}/lib/systemd/system/generic-board-startup.service"
-	distro="Debian"
 fi
 
 #Backward compatibility, as setup_sdcard.sh expects [lsb_release -si > /etc/rcn-ee.conf]
@@ -570,11 +737,14 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		if [ -f /usr/bin/qemu-aarch64-static ] ; then
 			warn_qemu_will_fail=1
 		fi
+		if [ -f /usr/bin/qemu-riscv64-static ] ; then
+			warn_qemu_will_fail=1
+		fi
 	}
 
 	qemu_warning () {
 		if [ "\${warn_qemu_will_fail}" ] ; then
-			echo "Log: (chroot) Warning, qemu can fail here... (run on real armv7l hardware for production images)"
+			echo "Log: (chroot) Warning, qemu can fail here... (run on real target hardware for production images)"
 			echo "Log: (chroot): [\${qemu_command}]"
 		fi
 	}
@@ -597,17 +767,9 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 	}
 
 	install_pkg_updates () {
-		if [ -f /tmp/nodesource.gpg.key ] ; then
-			apt-key add /tmp/nodesource.gpg.key
-			rm -f /tmp/nodesource.gpg.key || true
-		fi
 		if [ -f /tmp/repos.azulsystems.com.pubkey.asc ] ; then
 			apt-key add /tmp/repos.azulsystems.com.pubkey.asc
 			rm -f /tmp/repos.azulsystems.com.pubkey.asc || true
-		fi
-		if [ "x${repo_rcnee}" = "xenable" ] ; then
-			apt-key add /tmp/repos.rcn-ee.net-archive-keyring.asc
-			rm -f /tmp/repos.rcn-ee.net-archive-keyring.asc || true
 		fi
 		if [ "x${repo_ros}" = "xenable" ] ; then
 			apt-key add /tmp/ros-archive-keyring.asc
@@ -630,8 +792,16 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		fi
 
 		echo "---------------------------------"
+
+		echo "debug: cat /etc/apt/sources.list-"
+		cat /etc/apt/sources.list
+		if [ -f /etc/apt/sources.list.d/beagle.list ] ; then
+			cat /etc/apt/sources.list.d/beagle.list
+		fi
+		echo "---------------------------------"
+
 		echo "debug: apt-get update------------"
-		apt-get update
+		apt-get update || true
 		echo "---------------------------------"
 
 		echo "debug: apt-get upgrade -y--------"
@@ -659,37 +829,12 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			if [ -f /bin/busybox ] ; then
 				echo "Log: (chroot): Setting up BusyBox"
 
-				busybox --install -s /usr/local/bin/
-
-				#conflicts with systemd reboot...
-				#BusyBox v1.22.1 (Debian 1:1.22.0-9+deb8u1) multi-call binary.
-				if [ -f /usr/local/bin/reboot ] ; then
-					rm -f /usr/local/bin/reboot
-				fi
-
-				#poweroff: broken...
-				#BusyBox v1.22.1 (Debian 1:1.22.0-9+deb8u1) multi-call binary.
-				if [ -f /usr/local/bin/poweroff ] ; then
-					rm -f /usr/local/bin/poweroff
-				fi
-
-				#df: unrecognized option '--portability'
-				#BusyBox v1.22.1 (Debian 1:1.22.0-9+deb8u1) multi-call binary.
-				if [ -f /usr/local/bin/df ] ; then
-					rm -f /usr/local/bin/df
-				fi
-
-				#tar: unrecognized option '--warning=no-timestamp'
-				#BusyBox v1.22.1 (Debian 1:1.22.0-9+deb8u1) multi-call binary.
-				if [ -f /usr/local/bin/tar ] ; then
-					rm -f /usr/local/bin/tar
-				fi
-
-				#run-parts: unrecognized option '--list'
-				#BusyBox v1.22.1 (Debian 1:1.22.0-9+deb8u1) multi-call binary.
-				if [ -f /usr/local/bin/run-parts ] ; then
-					rm -f /usr/local/bin/run-parts
-				fi
+				#Install only non-existent commands to avoid conflicts
+				for cmd in \$(busybox --list)
+				do
+					type \${cmd} >/dev/null 2>&1 ||
+						ln -s /bin/busybox /usr/local/bin/\${cmd}
+				done
 			fi
 		fi
 	}
@@ -697,9 +842,48 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 	install_pkgs () {
 		if [ ! "x${deb_additional_pkgs}" = "x" ] ; then
 			#Install the user choosen list.
-			echo "Log: (chroot) Installing: ${deb_additional_pkgs}"
-			apt-get update
-			apt-get -y install ${deb_additional_pkgs}
+			echo "Log: (chroot) Installing (deb_additional_pkgs): ${deb_additional_pkgs}"
+			apt-get update || true
+			echo "Log: (chroot): [apt-get install -y -q ${deb_additional_pkgs}]"
+			apt-get install -y -q ${deb_additional_pkgs}
+		fi
+
+		if [ ! "x${deb_console_application_pkgs}" = "x" ] ; then
+			#Install the user choosen list.
+			echo "Log: (chroot) Installing (deb_console_application_pkgs): ${deb_console_application_pkgs}"
+			apt-get update || true
+			echo "Log: (chroot): [apt-get install -y -q ${deb_console_application_pkgs}]"
+			apt-get install -y -q ${deb_console_application_pkgs}
+		fi
+
+		if [ ! "x${deb_desktop_prerequisite_pkgs}" = "x" ] ; then
+			#Install the user choosen list.
+			echo "Log: (chroot) Installing (deb_desktop_prerequisite_pkgs): ${deb_desktop_prerequisite_pkgs}"
+			apt-get update || true
+			echo "Log: (chroot): [apt-get install -y -q ${deb_desktop_prerequisite_pkgs}]"
+			apt-get install -y -q ${deb_desktop_prerequisite_pkgs}
+		fi
+
+		if [ ! "x${deb_desktop_pkgs}" = "x" ] ; then
+			#Install the user choosen list.
+			echo "Log: (chroot) Installing (deb_desktop_pkgs): ${deb_desktop_pkgs}"
+			apt-get update || true
+			echo "Log: (chroot): [apt-get install -y -q ${deb_desktop_pkgs}]"
+			apt-get install -y -q ${deb_desktop_pkgs}
+		fi
+
+		if [ ! "x${deb_desktop_application_pkgs}" = "x" ] ; then
+			#Install the user choosen list.
+			echo "Log: (chroot) Installing (deb_desktop_application_pkgs): ${deb_desktop_application_pkgs}"
+			apt-get update || true
+			echo "Log: (chroot): [apt-get install -y -q ${deb_desktop_application_pkgs}]"
+			apt-get install -y -q ${deb_desktop_application_pkgs}
+		fi
+
+		if [ ! "x${deb_purge_pkgs}" = "x" ] ; then
+			#Install the user choosen list.
+			echo "Log: (chroot) Removing (deb_purge_pkgs): ${deb_purge_pkgs}"
+			apt-get purge -y ${deb_purge_pkgs}
 		fi
 
 		if [ "x${chroot_enable_debian_backports}" = "xenable" ] ; then
@@ -710,13 +894,23 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		fi
 
 		if [ ! "x${repo_external_pkg_list}" = "x" ] ; then
-			echo "Log: (chroot) Installing (from external repo): ${repo_external_pkg_list}"
-			apt-get -y install ${repo_external_pkg_list}
+			echo "Log: (chroot) Installing (from external repo) (repo_external_pkg_list): ${repo_external_pkg_list}"
+			echo "Log: (chroot): [apt-get install -y -q ${repo_external_pkg_list}]"
+			apt-get install -y -q ${repo_external_pkg_list}
+		fi
+
+		if [ ! "x${repo_rcnee_pkg_list}" = "x" ] ; then
+			#Install the user choosen list.
+			echo "Log: (chroot) Installing (repo_rcnee_pkg_list): ${repo_rcnee_pkg_list}"
+			apt-get update || true
+			echo "Log: (chroot): [apt-get install -y -q ${repo_rcnee_pkg_list}]"
+			apt-get install -y -q ${repo_rcnee_pkg_list}
 		fi
 
 		if [ ! "x${repo_ros_pkg_list}" = "x" ] ; then
-			echo "Log: (chroot) Installing (from external repo): ${repo_ros_pkg_list}"
-			apt-get -y install ${repo_ros_pkg_list}
+			echo "Log: (chroot) Installing (from external repo) (repo_ros_pkg_list): ${repo_ros_pkg_list}"
+			echo "Log: (chroot): [apt-get install -y -q ${repo_ros_pkg_list}]"
+			apt-get install -y -q ${repo_ros_pkg_list}
 			#ROS: ubuntu, extra crude, cleanup....
 			apt autoremove -y || true
 		fi
@@ -728,36 +922,75 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			apt-mark hold chromium || true
 		fi
 
-		#Lets force depmod...
-		if [ ! "x${repo_rcnee_depmod0}" = "x" ] ; then
-			echo "Log: (chroot) Running depmod for: ${repo_rcnee_depmod0}"
-			depmod -a ${repo_rcnee_depmod0}
-			update-initramfs -u -k ${repo_rcnee_depmod0}
-		fi
-
-		#Lets force depmod...
-		if [ ! "x${repo_rcnee_depmod1}" = "x" ] ; then
-			echo "Log: (chroot) Running depmod for: ${repo_rcnee_depmod1}"
-			depmod -a ${repo_rcnee_depmod1}
-			update-initramfs -u -k ${repo_rcnee_depmod1}
-		fi
-
 		##Install last...
 		if [ ! "x${repo_rcnee_pkg_version}" = "x" ] ; then
-			echo "Log: (chroot) Installing modules for: ${repo_rcnee_pkg_version}"
-			apt-get -y install libpruio-modules-${repo_rcnee_pkg_version} || true
-			apt-get -y install rtl8723bu-modules-${repo_rcnee_pkg_version} || true
-			apt-get -y install rtl8821cu-modules-${repo_rcnee_pkg_version} || true
-			apt-get -y install seeed-modules-${repo_rcnee_pkg_version} || true
+			echo "Log: (chroot) Installing modules for: ${repo_rcnee_pkg_version} (it's okay if these fail to install...)"
+			apt-get install -y -q libpruio-modules-${repo_rcnee_pkg_version} || true
+			apt-get install -y -q rtl8723bu-modules-${repo_rcnee_pkg_version} || true
+			apt-get install -y -q rtl8723du-modules-${repo_rcnee_pkg_version} || true
+			apt-get install -y -q rtl8821cu-modules-${repo_rcnee_pkg_version} || true
+			apt-get install -y -q qcacld-2.0-modules-${repo_rcnee_pkg_version} || true
 
 			if [ ! "x${repo_rcnee_cmem_version}" = "x" ] ; then
-				apt-get -y install ti-cmem-${repo_rcnee_cmem_version}-modules-${repo_rcnee_pkg_version} || true
+				apt-get install -y -q ti-cmem-${repo_rcnee_cmem_version}-modules-${repo_rcnee_pkg_version} || true
 			else
-				apt-get -y install ti-cmem-modules-${repo_rcnee_pkg_version} || true
+				apt-get install -y -q ti-cmem-modules-${repo_rcnee_pkg_version} || true
+			fi
+
+			if [ ! "x${repo_rcnee_sgx_preinstall}" = "x" ] ; then
+				apt-get install -y -q ${repo_rcnee_sgx_preinstall}-modules-${repo_rcnee_pkg_version} || true
+			fi
+
+			if [ "x${repo_rcnee_modules}" = "xenable" ] ; then
+				mkdir -p /opt/modules/ || true
+				cd /opt/modules/
+				apt-get download bbb.io-kernel-tasks || true
+				apt-get download bbb.io-kernel-${repo_rcnee_kernel} || true
+				if [ "x${deb_arch}" = "xarmhf" ] ; then
+					apt-get download bbb.io-kernel-${repo_rcnee_kernel}-am335x || true
+					apt-get download bbb.io-kernel-${repo_rcnee_kernel}-am57xx || true || true
+					apt-get download ti-sgx-ti335x-modules-${repo_rcnee_pkg_version} || true
+					apt-get download ti-sgx-jacinto6evm-modules-${repo_rcnee_pkg_version} || true
+				fi
+				if [ "x${deb_arch}" = "xarm64" ] ; then
+					apt-get download bbb.io-kernel-${repo_rcnee_kernel}-k3-am62 || true
+					apt-get download bbb.io-kernel-${repo_rcnee_kernel}-k3-j721e || true || true
+					apt-get download ti-sgx-am62-modules-${repo_rcnee_pkg_version} || true
+					apt-get download ti-sgx-j721e-modules-${repo_rcnee_pkg_version} || true
+					apt-get download ti-sgx-am62-ddx-um || true
+					apt-get download ti-sgx-j721e-ddx-um || true
+				fi
+				echo "branch=${repo_rcnee_kernel}" > /opt/modules/install
+				echo "uname=${repo_rcnee_pkg_version}" >> /opt/modules/install
+				cd -
 			fi
 
 			depmod -a ${repo_rcnee_pkg_version}
 			update-initramfs -u -k ${repo_rcnee_pkg_version}
+		fi
+	}
+
+	install_python_pkgs () {
+		if [ ! "x${python3_pkgs}" = "x" ] ; then
+			if [ ! "x${python3_extra_index}" = "x" ] ; then
+				python3 -m pip install --extra-index-url ${python3_extra_index} ${python3_pkgs}
+			else
+				echo "Log: (chroot) Installing [python3 -m pip install ${python3_pkgs}]"
+				python3 -m pip install ${python3_pkgs}
+			fi
+		fi
+	}
+
+	install_docker_ce () {
+		if [ "x${rfs_enable_docker_ci}" = "xenable" ] ; then
+			echo "Log: (chroot): install_docker_ce"
+			DEBIAN_FRONTEND=noninteractive apt-get install -y -q apt-transport-https ca-certificates curl gpg
+			mkdir -p /etc/apt/keyrings && chmod -R 0755 /etc/apt/keyrings
+			curl -fsSL "https://download.docker.com/linux/debian/gpg" | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+			chmod a+r /etc/apt/keyrings/docker.gpg
+			echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bullseye stable" > /etc/apt/sources.list.d/docker.list
+			apt-get update || true
+			apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-ce-rootless-extras docker-buildx-plugin || true
 		fi
 	}
 
@@ -771,6 +1004,42 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 				sed -i -e 's:#Banner none:Banner /etc/issue.net:g' /etc/ssh/sshd_config
 			fi
 		fi
+
+		# set system type
+		echo "ICON_NAME=computer-embedded" > /etc/machine-info
+		echo "CHASSIS=embedded" >> /etc/machine-info
+
+		#https://github.com/RobertCNelson/omap-image-builder/issues/131
+		if [ -f /var/lib/connman/settings ] ; then
+			echo "Log: (chroot): /var/lib/connman/settings"
+			cat /var/lib/connman/settings
+			sed -i -e 's:OfflineMode=false:OfflineMode=false\nTimezoneUpdates=manual:g' /var/lib/connman/settings
+			sed -i -e 's:OfflineMode=false:OfflineMode=false\nTimeUpdates=manual:g' /var/lib/connman/settings
+			echo "Log: (chroot): Patched: /var/lib/connman/settings"
+			cat /var/lib/connman/settings
+		fi
+
+		if [ ! "x${rfs_xorg_config}" = "x" ] ; then
+			if [ -f /etc/bbb.io/templates/${rfs_xorg_config} ] ; then
+				cp -v /etc/bbb.io/templates/${rfs_xorg_config} /etc/X11/xorg.conf
+				echo "Log: (chroot): Configured /etc/X11/xorg.conf"
+				cat /etc/X11/xorg.conf
+			fi
+		fi
+
+		if [ ! "x${rfs_default_desktop}" = "x" ] ; then
+			if [ -d /etc/lightdm/lightdm.conf.d/ ] ; then
+				echo "[Seat:*]" > /etc/lightdm/lightdm.conf.d/${rfs_username}.conf
+				echo "autologin-user=${rfs_username}" >> /etc/lightdm/lightdm.conf.d/${rfs_username}.conf
+				echo "autologin-session=${rfs_default_desktop}" >> /etc/lightdm/lightdm.conf.d/${rfs_username}.conf
+				echo "Log: (chroot): Configured /etc/lightdm/lightdm.conf.d/${rfs_username}.conf"
+				cat /etc/lightdm/lightdm.conf.d/${rfs_username}.conf
+			elif [ -f /etc/lightdm/lightdm.conf ] ; then
+				sed -i -e 's:#autologin-user=:autologin-user='$rfs_username':g' /etc/lightdm/lightdm.conf
+				sed -i -e 's:#autologin-session=:autologin-session='$rfs_default_desktop':g' /etc/lightdm/lightdm.conf
+				cat /etc/lightdm/lightdm.conf | grep autologin
+			fi
+		fi
 	}
 
 	set_locale () {
@@ -782,22 +1051,10 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 
 			if [ ! "x${rfs_default_locale}" = "x" ] ; then
 
-				case "\${distro}" in
-				Debian)
-					echo "Log: (chroot) Debian: setting up locales: [${rfs_default_locale}]"
-					sed -i -e 's:# ${rfs_default_locale} UTF-8:${rfs_default_locale} UTF-8:g' /etc/locale.gen
-					locale-gen
-					;;
-				Ubuntu)
-					echo "Log: (chroot) Ubuntu: setting up locales: [${rfs_default_locale}]"
-					locale-gen ${rfs_default_locale}
-					;;
-				esac
-
-				echo "LANG=${rfs_default_locale}" > /etc/default/locale
-
-				echo "Log: (chroot): [locale -a]"
-				locale -a
+				echo "Log: (chroot): setting up locales: [${rfs_default_locale} UTF-8]"
+				echo "locales locales/locales_to_be_generated multiselect ${rfs_default_locale} UTF-8" | debconf-set-selections
+				rm /etc/locale.gen || true
+				dpkg-reconfigure --frontend noninteractive locales
 			fi
 		else
 			dpkg_package_missing
@@ -806,7 +1063,7 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 
 	run_deborphan () {
 		echo "Log: (chroot): deborphan is not reliable, run manual and add pkg list to: [chroot_manual_deborphan_list]"
-		apt-get -y install deborphan
+		apt-get install -y -q deborphan
 
 		# Prevent deborphan from removing explicitly required packages
 		deborphan -A ${deb_additional_pkgs} ${repo_external_pkg_list} ${deb_include}
@@ -831,90 +1088,30 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		fi
 	}
 
-	dl_kernel () {
-		echo "Log: (chroot): dl_kernel"
-		wget --no-verbose --directory-prefix=/tmp/ \${kernel_url}
-
-		#This should create a list of files on the server
-		#<a href="file"></a>
-		cat /tmp/index.html | grep "<a href=" > /tmp/temp.html
-
-		#Note: cat drops one \...
-		#sed -i -e "s/<a href/\\n<a href/g" /tmp/temp.html
-		sed -i -e "s/<a href/\\\n<a href/g" /tmp/temp.html
-
-		sed -i -e 's/\"/\"><\/a>\n/2' /tmp/temp.html
-		cat /tmp/temp.html | grep href > /tmp/index.html
-
-		deb_file=\$(cat /tmp/index.html | grep linux-image)
-		deb_file=\$(echo \${deb_file} | awk -F ".deb" '{print \$1}')
-		deb_file=\${deb_file##*linux-image-}
-
-		kernel_version=\$(echo \${deb_file} | awk -F "_" '{print \$1}')
-		echo "Log: Using: \${kernel_version}"
-
-		deb_file="linux-image-\${deb_file}.deb"
-		wget --directory-prefix=/tmp/ \${kernel_url}\${deb_file}
-
-		dpkg -x /tmp/\${deb_file} /
-
-		pkg="initramfs-tools"
-		dpkg_check
-
-		if [ "x\${pkg_is_not_installed}" = "x" ] ; then
-			depmod \${kernel_version} -a
-			update-initramfs -c -k \${kernel_version}
-		else
-			dpkg_package_missing
-		fi
-
-		unset source_file
-		source_file=\$(cat /tmp/index.html | grep .diff.gz | head -n 1)
-		source_file=\$(echo \${source_file} | awk -F "\"" '{print \$2}')
-
-		if [ "\${source_file}" ] ; then
-			wget --directory-prefix=/opt/source/ \${kernel_url}\${source_file}
-		fi
-
-		rm -f /tmp/index.html || true
-		rm -f /tmp/temp.html || true
-		rm -f /tmp/\${deb_file} || true
-		rm -f /boot/System.map-\${kernel_version} || true
-		mv /boot/config-\${kernel_version} /opt/source || true
-		rm -rf /usr/src/linux-headers* || true
-	}
-
 	add_user () {
 		echo "Log: (chroot): add_user"
 		groupadd -r admin || true
-		groupadd -r spi || true
 
-		cat /etc/group | grep ^iio || groupadd -r iio || true
+		#i2c: by default, these come up root:i2c, so make sure i2c is used...[crw-rw---- 1 root i2c 89, 2 Feb 16 15:51 /dev/i2c-2]
+
 		cat /etc/group | grep ^i2c || groupadd -r i2c || true
-		cat /etc/group | grep ^docker || groupadd -r docker || true
 		cat /etc/group | grep ^kmem || groupadd -r kmem || true
 		cat /etc/group | grep ^netdev || groupadd -r netdev || true
+		cat /etc/group | grep ^render || groupadd -r render || true
 		cat /etc/group | grep ^systemd-journal || groupadd -r systemd-journal || true
 		cat /etc/group | grep ^tisdk || groupadd -r tisdk || true
 		cat /etc/group | grep ^weston-launch || groupadd -r weston-launch || true
-		cat /etc/group | grep ^xenomai || groupadd -r xenomai || true
 		cat /etc/group | grep ^bluetooth || groupadd -r bluetooth || true
 		cat /etc/group | grep ^cloud9ide || groupadd -r cloud9ide || true
 		cat /etc/group | grep ^gpio || groupadd -r gpio || true
-		cat /etc/group | grep ^pwm || groupadd -r pwm || true
-		cat /etc/group | grep ^eqep || groupadd -r eqep || true
-		cat /etc/group | grep ^remoteproc || groupadd -r remoteproc || true
 
-		echo "KERNEL==\"hidraw*\", GROUP=\"plugdev\", MODE=\"0660\"" > /etc/udev/rules.d/50-hidraw.rules
-		echo "KERNEL==\"spidev*\", GROUP=\"spi\", MODE=\"0660\"" > /etc/udev/rules.d/50-spi.rules
+		#echo "KERNEL==\"hidraw*\", GROUP=\"plugdev\", MODE=\"0660\"" > /etc/udev/rules.d/50-hidraw.rules
+		#echo "KERNEL==\"spidev*\", GROUP=\"gpio\", MODE=\"0660\"" > /etc/udev/rules.d/50-spi.rules
 
-		echo "#SUBSYSTEM==\"uio\", SYMLINK+=\"uio/%s{device/of_node/uio-alias}\"" > /etc/udev/rules.d/uio.rules
-		echo "SUBSYSTEM==\"uio\", GROUP=\"users\", MODE=\"0660\"" >> /etc/udev/rules.d/uio.rules
+		#echo "SUBSYSTEM==\"cmem\", GROUP=\"tisdk\", MODE=\"0660\"" > /etc/udev/rules.d/tisdk.rules
+		#echo "SUBSYSTEM==\"rpmsg_rpc\", GROUP=\"tisdk\", MODE=\"0660\"" >> /etc/udev/rules.d/tisdk.rules
 
-		echo "SUBSYSTEM==\"cmem\", GROUP=\"tisdk\", MODE=\"0660\"" > /etc/udev/rules.d/tisdk.rules
-		echo "SUBSYSTEM==\"rpmsg_rpc\", GROUP=\"tisdk\", MODE=\"0660\"" >> /etc/udev/rules.d/tisdk.rules
-
-		default_groups="admin,adm,cloud9ide,dialout,docker,gpio,pwm,eqep,iio,i2c,remoteproc,kmem,spi,cdrom,floppy,audio,dip,video,netdev,plugdev,bluetooth,users,systemd-journal,tisdk,weston-launch,xenomai"
+		default_groups="admin,adm,cloud9ide,dialout,gpio,i2c,input,kmem,cdrom,floppy,audio,dip,video,netdev,plugdev,bluetooth,users,render,systemd-journal,tisdk,weston-launch"
 
 		pkg="sudo"
 		dpkg_check
@@ -944,12 +1141,23 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 
 		mkdir -p /home/${rfs_username}/bin
 		chown ${rfs_username}:${rfs_username} /home/${rfs_username}/bin
-		
+
 		mkdir -p /home/${rfs_username}/.ssh 
 		echo "$PUBKEY" > /home/${rfs_username}/.ssh/key.pub
 		echo "$SECKEY" > /home/${rfs_username}/.ssh/key
 		chmod 0700 -R /home/${rfs_username}/.ssh
 		chown -R ${rfs_username}:${rfs_username} /home/${rfs_username}/.ssh
+
+		if [ "x${rfs_cyber_resilience_act}" = "xenable" ] ; then
+			if [ -f /lib/systemd/system/bbbio-set-sysconf.service ] || [ -f /usr/lib/systemd/system/bbbio-set-sysconf.service ] ; then
+				echo "Log: (chroot): [expire ${rfs_username} password]"
+				chage --lastday 0 ${rfs_username}
+				chage -l ${rfs_username}
+				###passwd -d works great for a default serial 'sign-up'
+				###but sadly ssh needs a default password, after which it'll ask for new one...
+				#passwd -d ${rfs_username}
+			fi
+		fi
 
 		if [ ! "x${rfs_desktop_icon}" = "x" ] ; then
 			if [ -f /usr/share/applications/${rfs_desktop_icon} ] ; then
@@ -966,13 +1174,23 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 				passwd -l root || true
 			else
 				passwd <<-EOF
-				root
-				root
+				${rfs_root_password}
+				${rfs_root_password}
 				EOF
+				echo "export PATH=\$PATH:/usr/local/sbin:/usr/sbin:/sbin" >> /root/.bashrc
+
+				if [ "x${rfs_cyber_resilience_act}" = "xenable" ] ; then
+					if [ -f /lib/systemd/system/bbbio-set-sysconf.service ] || [ -f /usr/lib/systemd/system/bbbio-set-sysconf.service ] ; then
+						echo "Log: (chroot): [expire root password]"
+						chage --lastday 0 root
+						chage -l root
+						passwd -d root
+					fi
+				fi
 			fi
 
 			sed -i -e 's:#EXTRA_GROUPS:EXTRA_GROUPS:g' /etc/adduser.conf
-			sed -i -e 's:dialout:dialout i2c spi:g' /etc/adduser.conf
+			sed -i -e 's:dialout:dialout gpio i2c:g' /etc/adduser.conf
 			sed -i -e 's:#ADD_EXTRA_GROUPS:ADD_EXTRA_GROUPS:g' /etc/adduser.conf
 
 			;;
@@ -980,6 +1198,11 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			passwd -l root || true
 			;;
 		esac
+	}
+
+	add_user_group () {
+		echo "Log: (chroot): add_user_group"
+		cat /etc/group | grep ^docker && usermod -aG docker ${rfs_username} || true
 	}
 
 	debian_startup_script () {
@@ -1041,21 +1264,31 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 		echo "Log: (chroot): systemd_tweaks"
 		#We have systemd, so lets use it..
 
-		# make sure usb gadget works 
-		systemctl enable bb-usb-gadgets || true
-		systemctl enable systemd-networkd || true
+
+		if [ ! "x${rfs_use_systemdnetworkd}" = "x" ] ; then
+			if [ ! "x${rfs_use_systemdresolved}" = "x" ] ; then
+				apt-get install -y -q systemd-resolved || true
+			fi
+		fi
 
 		#systemd v215: systemd-timesyncd.service replaces ntpdate
 		#enabled by default in v216 (not in jessie)
-		if [ -f /lib/systemd/system/systemd-timesyncd.service ] ; then
+		if [ -f /lib/systemd/system/systemd-timesyncd.service ] || [ -f /usr/lib/systemd/system/systemd-timesyncd.service ] ; then
 			echo "Log: (chroot): enabling: systemd-timesyncd.service"
 			systemctl enable systemd-timesyncd.service || true
 
-			#set our own initial date stamp, otherwise we get July 2014
+			#systemd v232: (Debian Stretch): Legacy...
 			touch /var/lib/systemd/clock
 
 			#if systemd-timesync user exits, use that instead. (this user was removed in later systemd's)
 			cat /etc/group | grep ^systemd-timesync && chown systemd-timesync:systemd-timesync /var/lib/systemd/clock || true
+
+			#systemd v235+: (Debian Buster/Bullseye)
+			mkdir -p /var/lib/systemd/timesync/ || true
+			touch /var/lib/systemd/timesync/clock
+
+			#if systemd-timesync user exits, use that instead. (this user was removed in later systemd's)
+			cat /etc/group | grep ^systemd-timesync && chown systemd-timesync:systemd-timesync /var/lib/systemd/timesync/clock || true
 
 			#Remove ntpdate
 			if [ -f /usr/sbin/ntpdate ] ; then
@@ -1063,63 +1296,211 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 			fi
 		fi
 
+		if [ -f /usr/bin/connmanctl ] ; then
+			#kill systemd/connman-wait-online.service, as it delays serial console upto 2 minutes...
+			if [ -f /etc/systemd/system/network-online.target.wants/connman-wait-online.service ] ; then
+				systemctl disable connman-wait-online.service || true
+			fi
+		fi
 
 		#We manually start dnsmasq, usb0/SoftAp0 are not available till late in boot...
-		if [ -f /lib/systemd/system/dnsmasq.service ] ; then
+		if [ -f /lib/systemd/system/dnsmasq.service ] || [ -f /usr/lib/systemd/system/dnsmasq.service ] ; then
 			systemctl disable dnsmasq.service || true
 		fi
 
 		#We use, so make sure udhcpd is disabled at bootup...
-		if [ -f /lib/systemd/system/udhcpd.service ] ; then
+		if [ -f /lib/systemd/system/udhcpd.service ] || [ -f /usr/lib/systemd/system/udhcpd.service ] ; then
 			systemctl disable udhcpd.service || true
 		fi
 
 		#Our kernels do not have ubuntu's ureadahead patches...
-		if [ -f /lib/systemd/system/ureadahead.service ] ; then
+		if [ -f /lib/systemd/system/ureadahead.service ] || [ -f /usr/lib/systemd/system/ureadahead.service ] ; then
 			systemctl disable ureadahead.service || true
 		fi
 
-		#No guarantee we will have an active network connection...
-		#debian@beaglebone:~$ sudo systemd-analyze blame | grep apt-daily.service
-		#     9.445s apt-daily.services
-		if [ -f /lib/systemd/system/apt-daily.service ] ; then
-			systemctl disable apt-daily.service || true
-			systemctl disable apt-daily.timer || true
+		if [ ! -f /etc/apt/apt.conf.d/50unattended-upgrades ] ; then
+			#No guarantee we will have an active network connection...
+			#debian@beaglebone:~$ sudo systemd-analyze blame | grep apt-daily.service
+			#     9.445s apt-daily.services
+			if [ -f /lib/systemd/system/apt-daily.service ] || [ -f /usr/lib/systemd/system/apt-daily.service ] ; then
+				systemctl disable apt-daily.service || true
+				systemctl disable apt-daily.timer || true
+			fi
+
+			#No guarantee we will have an active network connection...
+			#debian@beaglebone:~$ sudo systemd-analyze blame | grep apt-daily-upgrade.service
+			#     10.300s apt-daily-upgrade.service
+			if [ -f /lib/systemd/system/apt-daily-upgrade.service ] || [ -f /usr/lib/systemd/system/apt-daily-upgrade.service ] ; then
+				systemctl disable apt-daily-upgrade.service || true
+				systemctl disable apt-daily-upgrade.timer || true
+			fi
 		fi
 
-		#No guarantee we will have an active network connection...
-		#debian@beaglebone:~$ sudo systemd-analyze blame | grep apt-daily-upgrade.service
-		#     10.300s apt-daily-upgrade.service
-		if [ -f /lib/systemd/system/apt-daily-upgrade.service ] ; then
-			systemctl disable apt-daily-upgrade.service || true
-			systemctl disable apt-daily-upgrade.timer || true
+		if [ -f /usr/bin/connmanctl ] ; then
+			#We use connman...
+			if [ -f /lib/systemd/system/systemd-networkd.service ] || [ -f /usr/lib/systemd/system/systemd-networkd.service ] ; then
+				systemctl disable systemd-networkd.service || true
+			fi
 		fi
 
+		if [ -f /usr/bin/connmanctl ] ; then
+			#We use dnsmasq & connman...
+			if [ -f /lib/systemd/system/systemd-resolved.service ] || [ -f /usr/lib/systemd/system/systemd-resolved.service ] ; then
+				systemctl disable systemd-resolved.service || true
+			fi
+		fi
 
-		#We use dnsmasq & connman...
-#		if [ -f /lib/systemd/system/systemd-resolved.service ] ; then
-#			systemctl disable systemd-resolved.service || true
-#		fi
+		if [ ! "x${rfs_use_systemdnetworkd}" = "x" ] ; then
+			if [ -f /etc/bbb.io/templates/eth0-DHCP.network ] ; then
+				cp -v /etc/bbb.io/templates/eth0-DHCP.network /etc/systemd/network/eth0.network
+			fi
+
+			if [ -f /lib/systemd/system/systemd-networkd.service ] || [ -f /usr/lib/systemd/system/systemd-networkd.service ] ; then
+				systemctl enable systemd-networkd.service || true
+			fi
+
+			if [ -f /lib/systemd/system/iwd.service ] || [ -f /usr/lib/systemd/system/iwd.service ] ; then
+				systemctl enable iwd.service || true
+			else
+				if [ -f /lib/systemd/system/wpa_supplicant@.service ] ; then
+					systemctl enable wpa_supplicant@wlan0 || true
+
+					if [ -f /etc/bbb.io/templates/mlan0-DHCP.network ] ; then
+						systemctl enable wpa_supplicant@mlan0 || true
+					fi
+				fi
+			fi
+
+			if [ -f /lib/systemd/system/systemd-networkd-wait-online.service ] || [ -f /usr/lib/systemd/system/systemd-networkd-wait-online.service ] ; then
+				systemctl disable systemd-networkd-wait-online.service || true
+			fi
+
+			if [ -f /lib/systemd/system/systemd-resolved.service ] || [ -f /usr/lib/systemd/system/systemd-resolved.service ] ; then
+				systemctl enable systemd-resolved.service || true
+			else
+				if [ -f /etc/iwd/main.conf ] ; then
+					sed -i -e 's:#NameResolvingService:NameResolvingService:g' /etc/iwd/main.conf
+				fi
+			fi
+
+			if [ -f /etc/systemd/system/multi-user.target.wants/ModemManager.service ] ; then
+				systemctl disable ModemManager.service || true
+			fi
+
+			if [ -f /etc/systemd/system/multi-user.target.wants/NetworkManager.service ] ; then
+				systemctl disable NetworkManager.service || true
+			fi
+
+			if [ "x${rfs_disable_usb_gadgets}" = "x" ] ; then
+				#Starting with Bullseye, we have a version of systemd with After=usb-gadget.target!!!
+				if [ -f /lib/systemd/system/bb-usb-gadgets.service ] || [ -f /usr/lib/systemd/system/bb-usb-gadgets.service ] ; then
+					systemctl enable bb-usb-gadgets.service || true
+				fi
+			fi
+		fi
+
+		if [ ! "x${rfs_use_networkmanager}" = "x" ] ; then
+			if [ -f /lib/systemd/system/NetworkManager.service ] || [ -f /usr/lib/systemd/system/NetworkManager.service ] ; then
+				systemctl enable NetworkManager.service || true
+			fi
+
+			if [ -f /lib/systemd/system/systemd-resolved.service ] || [ -f /usr/lib/systemd/system/systemd-resolved.service ] ; then
+				systemctl enable systemd-resolved.service || true
+			fi
+
+			if [ "x${rfs_disable_usb_gadgets}" = "x" ] ; then
+				#Starting with Bullseye, we have a version of systemd with After=usb-gadget.target!!!
+				if [ -f /lib/systemd/system/bb-usb-gadgets.service ] || [ -f /usr/lib/systemd/system/bb-usb-gadgets.service ] ; then
+					systemctl enable bb-usb-gadgets.service || true
+				fi
+			fi
+		fi
+>>>>>>> 62bfc00e7fd668d8660ecd482a512ec23a6c551d
 
 		#Kill man-db
 		#debian@beaglebone:~$ sudo systemd-analyze blame | grep man-db.service
 		#    4min 10.587s man-db.service
-		if [ -f /lib/systemd/system/man-db.service ] ; then
+		if [ -f /lib/systemd/system/man-db.service ] || [ -f /usr/lib/systemd/system/man-db.service ] ; then
 			systemctl disable man-db.service || true
 			systemctl disable man-db.timer || true
 		fi
 
 		#Anyone who needs this can enable it...
-		if [ -f /lib/systemd/system/pppd-dns.service ] ; then
+		if [ -f /lib/systemd/system/pppd-dns.service ] || [ -f /usr/lib/systemd/system/pppd-dns.service ] ; then
 			systemctl disable pppd-dns.service || true
 		fi
 
-		if [ -f /lib/systemd/system/hostapd.service ] ; then
+		if [ -f /lib/systemd/system/hostapd.service ] || [ -f /usr/lib/systemd/system/hostapd.service ] ; then
 			systemctl disable hostapd.service || true
 		fi
 
-		if [ -f /usr/bin/docker ] ; then
-			sudo systemctl enable docker.service || true
+		#Starting with Bullseye, we are copying RPi's regenerate_ssh_host_keys service...
+		if [ -f /lib/systemd/system/regenerate_ssh_host_keys.service ] || [ -f /usr/lib/systemd/system/regenerate_ssh_host_keys.service ] ; then
+			systemctl enable regenerate_ssh_host_keys.service || true
+		fi
+
+		if [ "x${rfs_disable_grow_partition}" = "x" ] ; then
+			if [ -f /lib/systemd/system/grow_partition.service ] || [ -f /usr/lib/systemd/system/grow_partition.service ] ; then
+				systemctl enable grow_partition.service || true
+			fi
+		fi
+
+		if [ "x${repo_rcnee_modules}" = "xenable" ] ; then
+			if [ -f /lib/systemd/system/bb_install_modules.service ] || [ -f /usr/lib/systemd/system/bb_install_modules.service ] ; then
+				systemctl enable bb_install_modules.service || true
+			fi
+		fi
+
+		if [ "x${rfs_enable_nodered}" = "xenable" ] ; then
+			if [ -f /lib/systemd/system/nodered.service ] || [ -f /usr/lib/systemd/system/nodered.service ] ; then
+				#Don't just enable on the old socket version...
+				if [ ! -f /lib/systemd/system/nodered.socket ] ; then
+					systemctl enable nodered.service || true
+				fi
+			fi
+		fi
+
+		if [ "x${rfs_enable_edgeai}" = "xenable" ] ; then
+			if [ -f /lib/systemd/system/bb-start-vision-apps-eaik-8-2.service ] || [ -f /usr/lib/systemd/system/bb-start-vision-apps-eaik-8-2.service ] ; then
+				systemctl enable bb-start-vision-apps-eaik-8-2.service || true
+			fi
+		fi
+
+		if [ "x${rfs_enable_vscode}" = "xenable" ] ; then
+			if [ "x${rfs_enable_vscode_user}" = "xenable" ] ; then
+				if [ -f /lib/systemd/system/code-server@.service ] || [ -f /usr/lib/systemd/system/code-server@.service ] ; then
+					systemctl enable code-server@${rfs_username} || true
+					mkdir -p /home/${rfs_username}/.config/code-server/ || true
+					echo "bind-addr: 0.0.0.0:3000" > /home/${rfs_username}/.config/code-server/config.yaml
+					echo "auth: none" >> /home/${rfs_username}/.config/code-server/config.yaml
+					echo "cert: true" >> /home/${rfs_username}/.config/code-server/config.yaml
+					mkdir -p /home/${rfs_username}/.local/share/code-server/User/ || true
+					cp -v /opt/bb-code-server/settings.json /home/${rfs_username}/.local/share/code-server/User/ || true
+					chown -R ${rfs_username}:${rfs_username} /home/${rfs_username}/.config/ || true
+					chown -R ${rfs_username}:${rfs_username} /home/${rfs_username}/.local/ || true
+				fi
+			else
+				if [ -f /lib/systemd/system/bb-code-server.service ] || [ -f /usr/lib/systemd/system/bb-code-server.service ] ; then
+					systemctl enable bb-code-server.service || true
+				fi
+			fi
+		else
+			if [ -f /lib/systemd/system/dphys-swapfile.service ] || [ -f /usr/lib/systemd/system/dphys-swapfile.service ] ; then
+				systemctl disable dphys-swapfile.service || true
+			fi
+		fi
+
+		if [ -f /lib/systemd/system/bb-symlinks.service ] || [ -f /usr/lib/systemd/system/bb-symlinks.service ] ; then
+			systemctl enable bb-symlinks.service || true
+		fi
+
+		#EW 2022 demo...
+		if [ -f /lib/systemd/system/ti-ew-2022.service ] || [ -f /usr/lib/systemd/system/ti-ew-2022.service ] ; then
+			systemctl enable ti-ew-2022.service || true
+		fi
+
+		if [ -f /lib/systemd/system/bbbio-set-sysconf.service ] || [ -f /usr/lib/systemd/system/bbbio-set-sysconf.service ] ; then
+			systemctl enable bbbio-set-sysconf.service || true
 		fi
 	}
 
@@ -1156,6 +1537,8 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 
 	install_pkg_updates
 	install_pkgs
+	install_python_pkgs
+	install_docker_ce
 	system_tweaks
 	set_locale
 	if [ "x${chroot_not_reliable_deborphan}" = "xenable" ] ; then
@@ -1163,28 +1546,26 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 	fi
 	manual_deborphan
 	add_user
+	add_user_group
 
 	mkdir -p /opt/source || true
 	touch /opt/source/list.txt
 
 	startup_script
 
-	pkg="wget"
-	dpkg_check
-
-	if [ "x\${pkg_is_not_installed}" = "x" ] ; then
-		if [ "${rfs_kernel}" ] ; then
-			for kernel_url in ${rfs_kernel} ; do dl_kernel ; done
-		fi
-	else
-		dpkg_package_missing
-	fi
-
 	pkg="c9-core-installer"
 	dpkg_check
 
 	if [ "x\${pkg_is_not_installed}" = "x" ] ; then
 		apt-mark hold c9-core-installer || true
+	fi
+
+	#We disable the ability to auto upgrade this specific pacakge as they might be insode VSCode, which will fail...
+	pkg="bb-code-server"
+	dpkg_check
+
+	if [ "x\${pkg_is_not_installed}" = "x" ] ; then
+		apt-mark hold bb-code-server || true
 	fi
 
 	if [ -f /lib/systemd/systemd ] ; then
@@ -1249,14 +1630,23 @@ if [ "x${include_firmware}" = "xenable" ] ; then
 	fi
 fi
 
-if [ "x${repo_rcnee_sgx}" = "xenable" ] ; then
-	sgx_http="https://rcn-ee.net/repos/debian/pool/main"
-	sudo mkdir -p "${tempdir}/opt/sgx/"
-	sudo wget --directory-prefix="${tempdir}/opt/sgx/" ${sgx_http}/t/ti-sgx-ti33x-ddk-um/ti-sgx-ti33x-ddk-um_1.14.3699939-git20171201.0-0rcnee9~stretch+20190328_armhf.deb
-	sudo wget --directory-prefix="${tempdir}/opt/sgx/" ${sgx_http}/t/ti-sgx-ti335x-modules-${repo_rcnee_pkg_version}/ti-sgx-ti335x-modules-${repo_rcnee_pkg_version}_1${deb_codename}_armhf.deb
-	sudo wget --directory-prefix="${tempdir}/opt/sgx/" ${sgx_http}/t/ti-sgx-jacinto6evm-modules-${repo_rcnee_pkg_version}/ti-sgx-jacinto6evm-modules-${repo_rcnee_pkg_version}_1${deb_codename}_armhf.deb
-	wfile="${tempdir}/opt/sgx/status"
-	sudo sh -c "echo 'not_installed' >> ${wfile}"
+#repo_rcnee_sgx_preinstall: we've pre-selected ti335x or jacinto6evm, no decision on first bootup...
+if [ "x${repo_rcnee_sgx_preinstall}" = "x" ] ; then
+	if [ "x${repo_rcnee_sgx}" = "xenable" ] ; then
+		sgx_http="https://rcn-ee.net/repos/debian/pool/main"
+		sudo mkdir -p "${tempdir}/opt/sgx/"
+		sudo wget --directory-prefix="${tempdir}/opt/sgx/" ${sgx_http}/t/ti-sgx-ti33x-ddk-um/ti-sgx-ti33x-ddk-um_1.14.3699939-git20171201.0-0rcnee9~stretch+20190328_armhf.deb
+		sudo wget --directory-prefix="${tempdir}/opt/sgx/" ${sgx_http}/t/ti-sgx-ti335x-modules-${repo_rcnee_pkg_version}/ti-sgx-ti335x-modules-${repo_rcnee_pkg_version}_1${deb_codename}_armhf.deb
+		sudo wget --directory-prefix="${tempdir}/opt/sgx/" ${sgx_http}/t/ti-sgx-jacinto6evm-modules-${repo_rcnee_pkg_version}/ti-sgx-jacinto6evm-modules-${repo_rcnee_pkg_version}_1${deb_codename}_armhf.deb
+		wfile="${tempdir}/opt/sgx/status"
+		sudo sh -c "echo 'not_installed' >> ${wfile}"
+	fi
+else
+	if [ "x${repo_rcnee_sgx}" = "xenable" ] ; then
+		sudo mkdir -p "${tempdir}/opt/sgx/"
+		wfile="${tempdir}/opt/sgx/status"
+		sudo sh -c "echo 'installed' >> ${wfile}"
+	fi
 fi
 
 if [ -n "${early_chroot_script}" -a -r "${DIR}/target/chroot/${early_chroot_script}" ] ; then
@@ -1293,16 +1683,28 @@ if [ ! "x${rfs_console_banner}" = "x" ] || [ ! "x${rfs_console_user_pass}" = "x"
 	wfile="${tempdir}/etc/issue"
 	if [ ! "x${rfs_etc_dogtag}" = "x" ] ; then
 		sudo sh -c "cat '${tempdir}/etc/dogtag' >> ${wfile}"
-		sudo sh -c "echo '' >> ${wfile}"
 	fi
 	if [ ! "x${rfs_console_banner}" = "x" ] ; then
 		sudo sh -c "echo '${rfs_console_banner}' >> ${wfile}"
-		sudo sh -c "echo '' >> ${wfile}"
 	fi
 	if [ ! "x${rfs_console_user_pass}" = "x" ] ; then
-		sudo sh -c "echo 'default username:password is [${rfs_username}:${rfs_password}]' >> ${wfile}"
-		sudo sh -c "echo '' >> ${wfile}"
+		if [ ! "x${rfs_cyber_resilience_act}" = "xenable" ] ; then
+			sudo sh -c "echo 'default username:password is [${rfs_username}:${rfs_password}]' >> ${wfile}"
+		else
+			case "${deb_distribution}" in
+			debian)
+				sudo sh -c "echo 'default username is [${rfs_username}] with a one time password of [${rfs_password}]' >> ${wfile}"
+				if [ ! "x${rfs_disable_root}" = "xenable" ] ; then
+					sudo sh -c "echo 'default [root] account is also enabled, make sure to login once as [root] to setup your password' >> ${wfile}"
+				fi
+				;;
+			ubuntu)
+				sudo sh -c "echo 'default username is [${rfs_username}] with a one time password of [${rfs_password}]' >> ${wfile}"
+				;;
+			esac
+		fi
 	fi
+	sudo sh -c "echo '' >> ${wfile}"
 fi
 
 if [ ! "x${rfs_ssh_banner}" = "x" ] || [ ! "x${rfs_ssh_user_pass}" = "x" ] ; then
@@ -1311,16 +1713,19 @@ if [ ! "x${rfs_ssh_banner}" = "x" ] || [ ! "x${rfs_ssh_user_pass}" = "x" ] ; the
 	sudo sh -c "echo '' >> ${wfile}"
 	if [ ! "x${rfs_etc_dogtag}" = "x" ] ; then
 		sudo sh -c "cat '${tempdir}/etc/dogtag' >> ${wfile}"
-		sudo sh -c "echo '' >> ${wfile}"
 	fi
 	if [ ! "x${rfs_ssh_banner}" = "x" ] ; then
 		sudo sh -c "echo '${rfs_ssh_banner}' >> ${wfile}"
-		sudo sh -c "echo '' >> ${wfile}"
 	fi
 	if [ ! "x${rfs_ssh_user_pass}" = "x" ] ; then
-		sudo sh -c "echo 'default username:password is [${rfs_username}:${rfs_password}]' >> ${wfile}"
-		sudo sh -c "echo '' >> ${wfile}"
+		if [ ! "x${rfs_cyber_resilience_act}" = "xenable" ] ; then
+			sudo sh -c "echo 'default username:password is [${rfs_username}:${rfs_password}]' >> ${wfile}"
+		else
+			###ROOT over ssh is blocked...
+			sudo sh -c "echo 'default username is [${rfs_username}] with a one time password of [${rfs_password}]' >> ${wfile}"
+		fi
 	fi
+	sudo sh -c "echo '' >> ${wfile}"
 fi
 
 #usually a qemu failure...
@@ -1345,9 +1750,40 @@ fi
 
 if [ -n "${chroot_script}" -a -r "${DIR}/target/chroot/${chroot_script}" ] ; then
 	report_size
+
+	#Most likely we will need working network...
+	echo "Log: setting up: /etc/resolv.conf"
+	sudo rm -f "${tempdir}/etc/resolv.conf" || true
+	wfile="${tempdir}/etc/resolv.conf"
+	sudo sh -c "echo 'nameserver 8.8.8.8' > ${wfile}"
+	sudo sh -c "echo 'nameserver 8.8.4.4' >> ${wfile}"
+
 	echo "Calling chroot_script script: ${chroot_script}"
 	sudo cp -v "${DIR}/.project" "${tempdir}/etc/oib.project"
 	sudo cp -v "${DIR}/target/chroot/${chroot_script}" "${tempdir}/final.sh"
+	sudo chroot "${tempdir}" /bin/bash -e final.sh
+	sudo rm -f "${tempdir}/final.sh" || true
+	sudo rm -f "${tempdir}/etc/oib.project" || true
+	chroot_script=""
+	if [ -f "${tempdir}/npm-debug.log" ] ; then
+		echo "Log: ERROR: npm error in script, review log [cat ${tempdir}/npm-debug.log]..."
+		exit 1
+	fi
+fi
+
+if [ ! "x${chroot_script_external}" = "x" ] ; then
+	report_size
+
+	#Most likely we will need working network...
+	echo "Log: setting up: /etc/resolv.conf"
+	sudo rm -f "${tempdir}/etc/resolv.conf" || true
+	wfile="${tempdir}/etc/resolv.conf"
+	sudo sh -c "echo 'nameserver 8.8.8.8' > ${wfile}"
+	sudo sh -c "echo 'nameserver 8.8.4.4' >> ${wfile}"
+
+	echo "Calling chroot_script script: ${chroot_script_external}"
+	sudo cp -v "${DIR}/.project" "${tempdir}/etc/oib.project"
+	sudo cp -v "${chroot_script_external}" "${tempdir}/final.sh"
 	sudo chroot "${tempdir}" /bin/bash -e final.sh
 	sudo rm -f "${tempdir}/final.sh" || true
 	sudo rm -f "${tempdir}/etc/oib.project" || true
@@ -1383,13 +1819,14 @@ cat > "${DIR}/cleanup_script.sh" <<-__EOF__
 
 	cleanup () {
 		echo "Log: (chroot): cleanup"
-		mkdir -p /boot/uboot/
 
 		if [ -f /etc/apt/apt.conf ] ; then
 			rm -rf /etc/apt/apt.conf || true
 		fi
 		apt-get clean
 		rm -rf /var/lib/apt/lists/*
+
+		rm -rf /root/.cache/pip
 
 		if [ -d /var/cache/c9-core-installer/ ] ; then
 			rm -rf /var/cache/c9-core-installer/ || true
@@ -1413,19 +1850,20 @@ cat > "${DIR}/cleanup_script.sh" <<-__EOF__
 			dpkg-divert --local --rename --remove /sbin/initctl
 		fi
 
-		if [ -f /etc/apt/apt.conf.d/03-proxy-oracle ] ; then
-			rm -rf /etc/apt/apt.conf.d/03-proxy-oracle || true
-		fi
-
 		if [ -f /etc/apt/apt.conf.d/03-proxy-https ] ; then
 			rm -rf /etc/apt/apt.conf.d/03-proxy-https || true
 		fi
 
 		#update time stamp before final cleanup...
 		if [ -f /lib/systemd/system/systemd-timesyncd.service ] ; then
+			#Legacy... Stretch???
 			touch /var/lib/systemd/clock
-
 			cat /etc/group | grep ^systemd-timesync && chown systemd-timesync:systemd-timesync /var/lib/systemd/clock || true
+
+			#systemd v235+: (Debian Buster/Bullseye)
+			mkdir -p /var/lib/systemd/timesync/ || true
+			touch /var/lib/systemd/timesync/clock
+			cat /etc/group | grep ^systemd-timesync && chown systemd-timesync:systemd-timesync /var/lib/systemd/timesync/clock || true
 		fi
 
 #		#This is tmpfs, clear out any left overs...
@@ -1445,6 +1883,13 @@ cat > "${DIR}/cleanup_script.sh" <<-__EOF__
 		ln -s /run/connman/resolv.conf /etc/resolv.conf
 	fi
 
+	if [ -f /lib/systemd/system/systemd-resolved.service ] || [ -f /usr/lib/systemd/system/systemd-resolved.service ] ; then
+		echo "Log: systemd-resolved creating /etc/resolv.conf symlink"
+		rm -rf /etc/resolv.conf.bak || true
+		rm -rf /etc/resolv.conf || true
+		ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+	fi
+
 	rm -f /cleanup_script.sh || true
 __EOF__
 
@@ -1453,12 +1898,15 @@ sudo mv "${DIR}/cleanup_script.sh" "${tempdir}/cleanup_script.sh"
 sudo chroot "${tempdir}" /bin/bash -e cleanup_script.sh
 echo "Log: Complete: [sudo chroot ${tempdir} /bin/bash -e cleanup_script.sh]"
 
-#add /boot/uEnv.txt update script
-if [ -d "${tempdir}/etc/kernel/postinst.d/" ] ; then
-	if [ ! -f "${tempdir}/etc/kernel/postinst.d/zz-uenv_txt" ] ; then
-		sudo cp -v "${OIB_DIR}/target/other/zz-uenv_txt" "${tempdir}/etc/kernel/postinst.d/"
-		sudo chmod +x "${tempdir}/etc/kernel/postinst.d/zz-uenv_txt"
-		sudo chown root:root "${tempdir}/etc/kernel/postinst.d/zz-uenv_txt"
+
+if [ "x${deb_arch}" = "xarmhf" ] ; then
+	#add /boot/uEnv.txt update script
+	if [ -d "${tempdir}/etc/kernel/postinst.d/" ] ; then
+		if [ ! -f "${tempdir}/etc/kernel/postinst.d/zz-uenv_txt" ] ; then
+			sudo cp -v "${OIB_DIR}/target/other/zz-uenv_txt" "${tempdir}/etc/kernel/postinst.d/"
+			sudo chmod +x "${tempdir}/etc/kernel/postinst.d/zz-uenv_txt"
+			sudo chown root:root "${tempdir}/etc/kernel/postinst.d/zz-uenv_txt"
+		fi
 	fi
 fi
 
@@ -1470,6 +1918,10 @@ if [ -f "${tempdir}/usr/bin/qemu-aarch64-static" ] ; then
 	sudo rm -f "${tempdir}/usr/bin/qemu-aarch64-static" || true
 fi
 
+if [ -f "${tempdir}/usr/bin/qemu-riscv64-static" ] ; then
+	sudo rm -f "${tempdir}/usr/bin/qemu-riscv64-static" || true
+fi
+
 echo "${rfs_username}:${rfs_password}" > /tmp/user_password.list
 sudo mv /tmp/user_password.list "${DIR}/deploy/${export_filename}/user_password.list"
 
@@ -1478,6 +1930,8 @@ if [ -d "${tempdir}/etc/ssh/" -a "x${keep_ssh_keys}" = "x" ] ; then
 	#Remove pre-generated ssh keys, these will be regenerated on first bootup...
 	sudo rm -rf "${tempdir}"/etc/ssh/ssh_host_* || true
 	sudo touch "${tempdir}/etc/ssh/ssh.regenerate" || true
+	#Remove machine-id, this will be regenerated on first bootup...
+	sudo rm -f "${tempdir}"/etc/machine-id || true
 fi
 
 #ID.txt:
@@ -1486,23 +1940,16 @@ if [ -f "${tempdir}/etc/dogtag" ] ; then
 	sudo chown root:root "${DIR}/deploy/${export_filename}/ID.txt"
 fi
 
-#Add Google IPv4 nameservers
-if [ -f "${tempdir}/etc/resolv.conf" ] ; then
-	wfile="${tempdir}/etc/resolv.conf"
-	sudo sh -c "echo 'nameserver 8.8.8.8' > ${wfile}"
-	sudo sh -c "echo 'nameserver 8.8.4.4' >> ${wfile}"
-fi
-
 report_size
 chroot_umount
 
 if [ "x${chroot_COPY_SETUP_SDCARD}" = "xenable" ] ; then
 	echo "Log: copying setup_sdcard.sh related files"
-        if [ "x${chroot_custom_setup_sdcard}" = "x" ] ; then
-                sudo cp "${DIR}/tools/setup_sdcard.sh" "${DIR}/deploy/${export_filename}/"
-        else
-                sudo cp "${DIR}/tools/${chroot_custom_setup_sdcard}" "${DIR}/deploy/${export_filename}"
-        fi
+	if [ "x${chroot_custom_setup_sdcard}" = "x" ] ; then
+		sudo cp "${DIR}/tools/setup_sdcard.sh" "${DIR}/deploy/${export_filename}/"
+	else
+		sudo cp "${DIR}/tools/${chroot_custom_setup_sdcard}" "${DIR}/deploy/${export_filename}"
+	fi
 	sudo mkdir -p "${DIR}/deploy/${export_filename}/hwpack/"
 	sudo cp "${DIR}"/tools/hwpack/*.conf "${DIR}/deploy/${export_filename}/hwpack/"
 
@@ -1523,11 +1970,19 @@ fi
 if [ "x${chroot_directory}" = "xenable" ]; then
 	echo "Log: moving rootfs to directory: [${deb_arch}-rootfs-${deb_distribution}-${deb_codename}]"
 	sudo mv -v "${tempdir}" "${DIR}/deploy/${export_filename}/${deb_arch}-rootfs-${deb_distribution}-${deb_codename}"
-	du -h --max-depth=0 "${DIR}/deploy/${export_filename}/${deb_arch}-rootfs-${deb_distribution}-${deb_codename}"
+	sudo du -h --max-depth=0 "${DIR}/deploy/${export_filename}/${deb_arch}-rootfs-${deb_distribution}-${deb_codename}"
 else
 	cd "${tempdir}" || true
+	if [ -d ./opt/u-boot/ ] ; then
+		cd ./opt/u-boot/ || true
+		echo "Copying: packaged version of U-Boot"
+		mkdir -p "${DIR}/deploy/${export_filename}/u-boot"
+		cp -r ./* "${DIR}/deploy/${export_filename}/u-boot"
+		tree "${DIR}/deploy/${export_filename}/u-boot"
+	fi
+	cd "${tempdir}" || true
 	echo "Log: packaging rootfs: [${deb_arch}-rootfs-${deb_distribution}-${deb_codename}.tar]"
-	sudo LANG=C tar --numeric-owner -cf "${DIR}/deploy/${export_filename}/${deb_arch}-rootfs-${deb_distribution}-${deb_codename}.tar" .
+	sudo LANG=C tar --numeric-owner --acls --xattrs -cf "${DIR}/deploy/${export_filename}/${deb_arch}-rootfs-${deb_distribution}-${deb_codename}.tar" .
 	cd "${DIR}/" || true
 	ls -lh "${DIR}/deploy/${export_filename}/${deb_arch}-rootfs-${deb_distribution}-${deb_codename}.tar"
 	sudo chown -R ${USER}:${USER} "${DIR}/deploy/${export_filename}/"

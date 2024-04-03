@@ -16,7 +16,6 @@ Necessary packages:
 
 
 
-
 Basic procedure: 
 - set the environmental variable RNO_G_PASSWORD correctly 
 - sudo ./rno-g_image.sh # (once per image). This will take a long time, and produce the image with the latest version of rno-g software.
