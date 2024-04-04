@@ -90,31 +90,26 @@ git_clone_full () {
 setup_system () {
 	#For when sed/grep/etc just gets way to complex...
 	cd /
-	if [ -f /opt/scripts/mods/debian-add-sbin-usr-sbin-to-default-path.diff ] ; then
-		if [ -f /usr/bin/patch ] ; then
-			echo "Patching: /etc/profile"
-			patch -p1 < /opt/scripts/mods/debian-add-sbin-usr-sbin-to-default-path.diff
+
+#	echo "" >> /etc/securetty
+#	echo "#USB Gadget Serial Port" >> /etc/securetty
+#	echo "ttyGS0" >> /etc/securetty
+
+#	#make the sound card work by default
+#	if [ -f /etc/alsa/tlv320aic3104.state.txt ] ; then
+#		if [ -d /var/lib/alsa/ ] ; then
+#			cp -v /etc/alsa/tlv320aic3104.state.txt /var/lib/alsa/asound.state
+#			cp -v /etc/alsa/tlv320aic3104.conf.txt /etc/asound.conf
 		fi
-	fi
+#	fi
 
-	echo "" >> /etc/securetty
-	echo "#USB Gadget Serial Port" >> /etc/securetty
-	echo "ttyGS0" >> /etc/securetty
 
-	#make the sound card work by default
-	if [ -f /etc/alsa/tlv320aic3104.state.txt ] ; then
-		if [ -d /var/lib/alsa/ ] ; then
-			cp -v /etc/alsa/tlv320aic3104.state.txt /var/lib/alsa/asound.state
-			cp -v /etc/alsa/tlv320aic3104.conf.txt /etc/asound.conf
-		fi
-	fi
-
-	echo "Setting up eth0"
-	# setup eth0 
-	echo "[Match]" >> /etc/systemd/network/eth0.network
-	echo "Name=eth0" >> /etc/systemd/network/eth0.network
-	echo "[Network]" >> /etc/systemd/network/eth0.network
-	echo "DHCP=ipv4" >> /etc/systemd/network/eth0.network
+	#echo "Setting up eth0"
+	## setup eth0 
+	#echo "[Match]" >> /etc/systemd/network/eth0.network
+	#echo "Name=eth0" >> /etc/systemd/network/eth0.network
+	#echo "[Network]" >> /etc/systemd/network/eth0.network
+	#echo "DHCP=ipv4" >> /etc/systemd/network/eth0.network
 
 	#disable dnsmasq? 
 	touch /etc/dnsmasq.d/.SoftAp0
