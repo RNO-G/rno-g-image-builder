@@ -100,7 +100,7 @@ setup_system () {
 #		if [ -d /var/lib/alsa/ ] ; then
 #			cp -v /etc/alsa/tlv320aic3104.state.txt /var/lib/alsa/asound.state
 #			cp -v /etc/alsa/tlv320aic3104.conf.txt /etc/asound.conf
-		fi
+#		fi
 #	fi
 
 
