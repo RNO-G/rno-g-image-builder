@@ -686,6 +686,9 @@ if [ "x${rfs_startup_scripts}" = "xenable" ] ; then
 	#while bb-customizations installes "generic-board-startup.service" other boards/configs could use this default.
 	sudo cp "${OIB_DIR}/target/init_scripts/systemd-generic-board-startup.service" "${tempdir}/lib/systemd/system/generic-board-startup.service"
 	sudo chown root:root "${tempdir}/lib/systemd/system/generic-board-startup.service"
+
+	sudo cp "${OIB_DIR}/target/init_scripts/auto-flash-emmc-if-image.service" "${tempdir}/lib/systemd/system/auto-flash-emmc-if-iamge.service"
+	sudo chown root:root "${tempdir}/lib/systemd/system/auto-flash-emmc-if-image.service"
 fi
 
 #Backward compatibility, as setup_sdcard.sh expects [lsb_release -si > /etc/rcn-ee.conf]

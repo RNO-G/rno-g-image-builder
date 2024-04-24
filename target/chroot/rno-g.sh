@@ -112,7 +112,7 @@ setup_system () {
 	#echo "DHCP=ipv4" >> /etc/systemd/network/eth0.network
 
 	#disable dnsmasq? 
-	touch /etc/dnsmasq.d/.SoftAp0
+#	touch /etc/dnsmasq.d/.SoftAp0
 
 }
 
@@ -183,7 +183,7 @@ install_rno_g_software () {
     cd ${git_target_dir} 
 
     if [ -f requirements.txt ] ; then 
-      pip3 install -r requirements.txt
+      pip3 install --break-system-packages -r requirements.txt
     fi 
 
     if [ -f setup.py ] ; then 
@@ -348,7 +348,6 @@ fi
 
 setup_keys() { 
 
-pip3 install ssh-import-id
 for gh_user in cozzyd jakobhenrichs tikarg ejobe ryankrebs016 
 do
 ssh-import-id gh:$gh_user|| true
