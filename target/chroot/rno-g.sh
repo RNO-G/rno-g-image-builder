@@ -88,71 +88,12 @@ git_clone_full () {
 }
 
 setup_system () {
-	#For when sed/grep/etc just gets way to complex...
-	cd /
-
-#	echo "" >> /etc/securetty
-#	echo "#USB Gadget Serial Port" >> /etc/securetty
-#	echo "ttyGS0" >> /etc/securetty
-
-#	#make the sound card work by default
-#	if [ -f /etc/alsa/tlv320aic3104.state.txt ] ; then
-#		if [ -d /var/lib/alsa/ ] ; then
-#			cp -v /etc/alsa/tlv320aic3104.state.txt /var/lib/alsa/asound.state
-#			cp -v /etc/alsa/tlv320aic3104.conf.txt /etc/asound.conf
-#		fi
-#	fi
-
-
-	#echo "Setting up eth0"
-	## setup eth0 
-	#echo "[Match]" >> /etc/systemd/network/eth0.network
-	#echo "Name=eth0" >> /etc/systemd/network/eth0.network
-	#echo "[Network]" >> /etc/systemd/network/eth0.network
-	#echo "DHCP=ipv4" >> /etc/systemd/network/eth0.network
-
-	#disable dnsmasq? 
-#	touch /etc/dnsmasq.d/.SoftAp0
-
+  systemctl disable bbbio-set-sysconf
+  systemctl disable unattended-upgrades
 }
 
-setup_desktop () {
-	if [ -d /etc/X11/ ] ; then
-		wfile="/etc/X11/xorg.conf"
-		echo "Patching: ${wfile}"
-		echo "Section \"Monitor\"" > ${wfile}
-		echo "        Identifier      \"Builtin Default Monitor\"" >> ${wfile}
-		echo "EndSection" >> ${wfile}
-		echo "" >> ${wfile}
-		echo "Section \"Device\"" >> ${wfile}
-		echo "        Identifier      \"Builtin Default fbdev Device 0\"" >> ${wfile}
-		echo "        Driver          \"fbdev\"" >> ${wfile}
-		echo "#HWcursor_false        Option          \"HWcursor\"          \"false\"" >> ${wfile}
-		echo "EndSection" >> ${wfile}
-		echo "" >> ${wfile}
-		echo "Section \"Screen\"" >> ${wfile}
-		echo "        Identifier      \"Builtin Default fbdev Screen 0\"" >> ${wfile}
-		echo "        Device          \"Builtin Default fbdev Device 0\"" >> ${wfile}
-		echo "        Monitor         \"Builtin Default Monitor\"" >> ${wfile}
-		echo "#DefaultDepth        DefaultDepth    16" >> ${wfile}
-		echo "EndSection" >> ${wfile}
-		echo "" >> ${wfile}
-		echo "Section \"ServerLayout\"" >> ${wfile}
-		echo "        Identifier      \"Builtin Default Layout\"" >> ${wfile}
-		echo "        Screen          \"Builtin Default fbdev Screen 0\"" >> ${wfile}
-		echo "EndSection" >> ${wfile}
-	fi
-
-	#Disable dpms mode and screen blanking
-	#Better fix for missing cursor
-	wfile="/home/${USER}/.xsessionrc"
-	echo "#!/bin/sh" > ${wfile}
-	echo "" >> ${wfile}
-	echo "xset -dpms" >> ${wfile}
-	echo "xset s off" >> ${wfile}
-	echo "xsetroot -cursor_name left_ptr" >> ${wfile}
-	chown -R ${USER}:${USER} ${wfile}
-}
+#setup_desktop () {
+#}
 
 
 install_rno_g_software () {
@@ -162,6 +103,8 @@ install_rno_g_software () {
   mkdir /rno-g/cfg
   mkdir /rno-g/lib
   mkdir /rno-g/include
+  mkdir /rno-g/var/
+  echo 1 > /rno-g/var/runfile
 
   mkdir /data 
 
@@ -169,12 +112,12 @@ install_rno_g_software () {
   echo "/rno-g/lib" >> /etc/ld.so.conf.d/rno-g.conf 
 
 
-  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal flowerpy rnog_gps
+  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal flowerpy rnog_gps stationrc
   do
     cd /home/rno-g
     git_repo="https://github.com/RNO-G/$gh_package"
     git_target_dir="/home/rno-g/$gh_package" 
-    git_clone 
+    git_clone_full
 
    
     echo "---------------------------------------------"
@@ -197,6 +140,8 @@ install_rno_g_software () {
         cd loader && make 
       elif [ "$gh_package" == "rno-g-ice-software" ] ; then 
         PREFIX=/rno-g make install cfg-install service-install
+      elif [ "$gh_package" == "rno-g-BBB-scripts" ] ; then 
+        PREFIX=/rno-g  UPDATE_INITRAMFS_ARGS=" -k ${repo_rcnee_pkg_version}" make install 
       else 
         PREFIX=/rno-g make install
       fi
@@ -207,10 +152,11 @@ install_rno_g_software () {
 
   done
 
-# summit branch, for now
+# sampling_rate_and_tuning branch, for now
   cd /home/rno-g
-  git clone --branch summit-branch https://github.com/RNO-G/radiant-python radpy-cal 
-  chown -R rno-g:rno-g radpy-cal 
+  ln -s radiant-python radpy-cal 
+  cd radiant-python && git checkout sampling_rate_and_tuning && cd
+
 
 #  #download swissbit lifetime monitoring tool (not anymore, it seems to have disappeared?) 
 #  mkdir -p /usr/local/bin  #just in case
@@ -243,8 +189,6 @@ install_rno_g_software () {
 
   ldconfig
 
-  # increase spidev buf size 
-  echo "options spidev bufsiz=131072" > /etc/modprobe.d/spidev.conf 
 
 }
 
@@ -284,50 +228,15 @@ install_git_repos () {
 		fi
 	fi
 
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-4.14-ti"
-	git_branch="v4.14.x-ti"
-	git_clone_branch
 
 	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-4.19-ti"
-	git_branch="v4.19.x-ti"
-	git_clone_branch
-
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-5.4-ti"
-	git_branch="v5.4.x-ti"
+	git_target_dir="/opt/source/dtb-5.10-ti"
+	git_branch="v5.10.x-ti-unified"
 	git_clone_branch
 
 	git_repo="https://github.com/beagleboard/bb.org-overlays"
 	git_target_dir="/opt/source/bb.org-overlays"
 	git_clone
-
-	if [ -f /usr/lib/librobotcontrol.so ] ; then
-		git_repo="https://github.com/StrawsonDesign/librobotcontrol"
-		git_target_dir="/opt/source/librobotcontrol"
-		git_clone
-
-		git_repo="https://github.com/mcdeoliveira/rcpy"
-		git_target_dir="/opt/source/rcpy"
-		git_clone
-		if [ -f ${git_target_dir}/.git/config ] ; then
-			cd ${git_target_dir}/
-			if [ -f /usr/bin/python3 ] ; then
-				/usr/bin/python3 setup.py install
-			fi
-		fi
-
-		git_repo="https://github.com/mcdeoliveira/pyctrl"
-		git_target_dir="/opt/source/pyctrl"
-		git_clone
-		if [ -f ${git_target_dir}/.git/config ] ; then
-			cd ${git_target_dir}/
-			if [ -f /usr/bin/python3 ] ; then
-				/usr/bin/python3 setup.py install
-			fi
-		fi
-	fi
 
 	git_repo="https://github.com/mvduin/py-uio"
 	git_target_dir="/opt/source/py-uio"
@@ -348,9 +257,8 @@ fi
 
 setup_keys() { 
 
-for gh_user in cozzyd jakobhenrichs tikarg ejobe ryankrebs016 
-do
-ssh-import-id gh:$gh_user|| true
+for gh_user in cozzyd jakobhenrichs tikarg ejobe ryankrebs016 fschlueter barawn ; do 
+ssh-import-id gh:$gh_user || true
 done
 
 chown -R rno-g:rno-g /home/$USER/.ssh
