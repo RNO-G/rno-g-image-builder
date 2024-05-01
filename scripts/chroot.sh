@@ -687,8 +687,6 @@ if [ "x${rfs_startup_scripts}" = "xenable" ] ; then
 	sudo cp "${OIB_DIR}/target/init_scripts/systemd-generic-board-startup.service" "${tempdir}/lib/systemd/system/generic-board-startup.service"
 	sudo chown root:root "${tempdir}/lib/systemd/system/generic-board-startup.service"
 
-	sudo cp "${OIB_DIR}/target/init_scripts/auto-flash-emmc-if-image.service" "${tempdir}/lib/systemd/system/auto-flash-emmc-if-iamge.service"
-	sudo chown root:root "${tempdir}/lib/systemd/system/auto-flash-emmc-if-image.service"
 fi
 
 #Backward compatibility, as setup_sdcard.sh expects [lsb_release -si > /etc/rcn-ee.conf]
@@ -702,6 +700,8 @@ echo "image_type=${image_type}" >> /tmp/rcn-ee.conf
 sudo mv /tmp/rcn-ee.conf "${tempdir}/etc/rcn-ee.conf"
 sudo chown root:root "${tempdir}/etc/rcn-ee.conf"
 
+sudo cp "${OIB_DIR}/target/init_scripts/auto-flash-emmc-if-image.service" "${tempdir}/lib/systemd/system/auto-flash-emmc-if-image.service"
+sudo chown root:root "${tempdir}/lib/systemd/system/auto-flash-emmc-if-image.service"
 
 PUBKEY=""
 SECKEY=""
@@ -979,7 +979,7 @@ cat > "${DIR}/chroot_script.sh" <<-__EOF__
 				python3 -m pip install --extra-index-url ${python3_extra_index} ${python3_pkgs}
 			else
 				echo "Log: (chroot) Installing [python3 -m pip install ${python3_pkgs}]"
-				python3 -m pip install ${python3_pkgs}
+				python3 -m pip install --break-system-packages ${python3_pkgs}
 			fi
 		fi
 	}
