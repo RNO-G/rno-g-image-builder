@@ -79,7 +79,7 @@ git_clone_branch () {
 
 git_clone_full () {
 	mkdir -p ${git_target_dir} || true
-	qemu_command="git clone ${git_repo} ${git_target_dir} || true"
+	qemu_command="git clone ${git_repo} ${git_target_dir} --recursive || true"
 	qemu_warning
 	git clone ${git_repo} ${git_target_dir} || true
 	chown -R 1000:1000 ${git_target_dir}
@@ -90,6 +90,9 @@ git_clone_full () {
 setup_system () {
   systemctl disable bbbio-set-sysconf
   systemctl disable unattended-upgrades
+  echo "#!/bin sh" > /etc/profile.d/add_sbin.sh
+  echo "export PATH=\"/usr/local/sbin:/usr/sbin:/sbin:\$PATH\"" >> /etc/profile.d/add_sbin.sh
+  echo spidev >> /etc/modules.d/modules.conf
 }
 
 #setup_desktop () {
@@ -112,7 +115,7 @@ install_rno_g_software () {
   echo "/rno-g/lib" >> /etc/ld.so.conf.d/rno-g.conf 
 
 
-  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal flowerpy rnog_gps stationrc
+  for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal flowerpy rnog_gps stationrc rno-g-device-trees
   do
     cd /home/rno-g
     git_repo="https://github.com/RNO-G/$gh_package"
@@ -142,6 +145,8 @@ install_rno_g_software () {
         PREFIX=/rno-g make install cfg-install service-install
       elif [ "$gh_package" == "rno-g-BBB-scripts" ] ; then 
         PREFIX=/rno-g  UPDATE_INITRAMFS_ARGS=" -k ${repo_rcnee_pkg_version}" make install 
+      elif [ "$gh_package" == "rno-g-device-trees" ] ; then 
+        PREFIX=/rno-g  KERNEL_VERSION="${repo_rcnee_pkg_version}" make install 
       else 
         PREFIX=/rno-g make install
       fi
@@ -151,6 +156,8 @@ install_rno_g_software () {
     chown -R rno-g:rno-g ${git_target_dir}
 
   done
+
+  chown -R rno-g:rno-g /rno-g
 
 # sampling_rate_and_tuning branch, for now
   cd /home/rno-g
