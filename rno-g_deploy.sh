@@ -3,6 +3,7 @@
 #beware: can only create different station id's in parallel! 
 station_id=0
 skip_sd=0
+rev=F
 
 if [ -z "$1" ] 
 then 
@@ -17,11 +18,19 @@ else
   station_id=$2
 fi
 
-if [ -z "$3" ] 
+if [-z "$3" ]
+then
+  echo "Assuming Rev F"
+else
+  rev=$3
+  echo "rev is $rev"
+fi
+
+if [ -z "$4" ] 
 then 
   echo "Formatting SD (or image)" 
 else
-  skip_sd=$3
+  skip_sd=$4
   echo "Skipping SD: $skip_sd" 
 fi
 
@@ -96,6 +105,9 @@ sudo sh -c "echo $station_id > $emmcmountdir/STATION_ID"
 sudo chmod 0444 $emmcmountdir/INTERNAL
 sudo chmod 0444 $emmcmountdir/STATION_ID
 sudo mkdir -p $emmcmountdir/mnt/sdcard 
+
+sudo sh -c "echo $rev > $sdmountdir/REV"
+sudo sh -c "echo $rev > $emmcmountdir/REV"
 
 #work around wrong name for some reason: 
 sudo sed -i 's/mmcblk0p1/mmcblk1p1/g' $emmcmountdir/etc/fstab
