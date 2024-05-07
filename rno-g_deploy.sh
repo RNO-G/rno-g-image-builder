@@ -80,7 +80,7 @@ fi
 
 
 #for some reason, it's actually called emmc-flash-4gb.img 
-sudo $prog --img-4gb $sdmountdir/emmc-flash.img $args --bootloader $orig_dir/emmc_boot/u-boot.img --spl $orig_dir/emmc_boot/MLO 
+sudo $prog --img-4gb $sdmountdir/emmc-flash.img $args --bootloader $orig_dir/emmc_boot/2024/u-boot.img --spl $orig_dir/emmc_boot/2024/MLO 
 
 sudo touch $sdmountdir/SDCARD
 sudo chmod 0444 $sdmountdir/SDCARD

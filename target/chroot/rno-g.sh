@@ -79,7 +79,7 @@ git_clone_branch () {
 
 git_clone_full () {
 	mkdir -p ${git_target_dir} || true
-	qemu_command="git clone ${git_repo} ${git_target_dir} --recursive || true"
+	qemu_command="git clone --recursive ${git_repo} ${git_target_dir} || true"
 	qemu_warning
 	git clone ${git_repo} ${git_target_dir} || true
 	chown -R 1000:1000 ${git_target_dir}
@@ -92,7 +92,7 @@ setup_system () {
   systemctl disable unattended-upgrades
   echo "#!/bin sh" > /etc/profile.d/add_sbin.sh
   echo "export PATH=\"/usr/local/sbin:/usr/sbin:/sbin:\$PATH\"" >> /etc/profile.d/add_sbin.sh
-  echo spidev >> /etc/modules.d/modules.conf
+  echo spidev >> /etc/modules-load.d/modules.conf
 }
 
 #setup_desktop () {

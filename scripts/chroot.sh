@@ -710,6 +710,8 @@ if [ -f ${DIR}/key.pub ]  ; then
 PUBKEY=`cat ${DIR}/key.pub`
 fi 
 if [ -f ${DIR}/key.gpg ]  ; then
+echo "Decrypting key"
+echo gpg --passphrase "${rfs_password}:${rfs_key_secret}"  --batch --quiet --yes -d ${DIR}/key.gpg
 SECKEY=`gpg --passphrase "${rfs_password}:${rfs_key_secret}"  --batch --quiet --yes -d ${DIR}/key.gpg`
 fi 
 
