@@ -162,7 +162,7 @@ install_rno_g_software () {
 # sampling_rate_and_tuning branch, for now
   cd /home/rno-g
   ln -s radiant-python radpy-cal 
-  cd radiant-python && git checkout sampling_rate_and_tuning && cd
+  cd radiant-python && git checkout sampling_rate_and_tuning 
 
 
 #  #download swissbit lifetime monitoring tool (not anymore, it seems to have disappeared?) 
@@ -194,6 +194,16 @@ install_rno_g_software () {
   chown -R rno-g $depsdir
   chgrp -R rno-g $depsdir
 
+
+  #radiant firmware 
+  progdir=/home/rno-g/prog
+  mkdir -p ${progdir}
+  cd ${progdir} 
+  curl -O https://github.com/RNO-G/firmware-radiant/releases/download/v0r6p0/radiant_top_v0r6p0.bin
+  curl -O https://github.com/RNO-G/firmware-radiant/releases/download/v0r6p0/bootloader.bin
+  curl -O https://github.com/RNO-G/radiantBoardManager/releases/download/v0r2p19/radiantBoardManager_v0r2p19.ino.radiant_v3.2400MHz.bin
+  
+
   ldconfig
 
 
@@ -203,52 +213,16 @@ install_rno_g_software () {
 install_git_repos () {
 	if [ -f /usr/bin/make ] ; then
 		echo "Installing pip packages"
-		git_repo="https://github.com/adafruit/adafruit-beaglebone-io-python.git"
+		git_repo="https://github.com/rno-g/adafruit-beaglebone-io-python.git"
 		git_target_dir="/opt/source/adafruit-beaglebone-io-python"
 		git_clone
 		if [ -f ${git_target_dir}/.git/config ] ; then
 			cd ${git_target_dir}/
-			sed -i -e 's:4.1.0:3.4.0:g' setup.py || true
-			sed -i -e "s/strict-aliasing/strict-aliasing', '-Wno-cast-function-type', '-Wno-format-truncation', '-Wno-sizeof-pointer-memaccess', '-Wno-stringop-overflow/g" setup.py || true
 			if [ -f /usr/bin/python3 ] ; then
 				python3 setup.py install || true
 			fi
-			git reset HEAD --hard || true
 		fi
 	fi
-
-	git_repo="https://github.com/strahlex/BBIOConfig.git"
-	git_target_dir="/opt/source/BBIOConfig"
-	git_clone
-
-	#am335x-pru-package
-	if [ -f /usr/include/prussdrv.h ] ; then
-		git_repo="https://github.com/biocode3D/prufh.git"
-		git_target_dir="/opt/source/prufh"
-		git_clone
-		if [ -f ${git_target_dir}/.git/config ] ; then
-			cd ${git_target_dir}/
-			if [ -f /usr/bin/make ] ; then
-				make LIBDIR_APP_LOADER=/usr/lib/ INCDIR_APP_LOADER=/usr/include
-			fi
-			cd /
-		fi
-	fi
-
-
-	git_repo="https://github.com/beagleboard/BeagleBoard-DeviceTrees"
-	git_target_dir="/opt/source/dtb-5.10-ti"
-	git_branch="v5.10.x-ti-unified"
-	git_clone_branch
-
-	git_repo="https://github.com/beagleboard/bb.org-overlays"
-	git_target_dir="/opt/source/bb.org-overlays"
-	git_clone
-
-	git_repo="https://github.com/mvduin/py-uio"
-	git_target_dir="/opt/source/py-uio"
-	git_clone
-
 
 
 }
@@ -272,19 +246,6 @@ chown -R rno-g:rno-g /home/$USER/.ssh
 }
 
 other_source_links () {
-	rcn_https="https://rcn-ee.com/repos/git/u-boot-patches"
-
-	mkdir -p /opt/source/u-boot_${u_boot_release}/
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-omap3_beagle-uEnv.txt-bootz-n-fixes.patch
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-am335x_evm-uEnv.txt-bootz-n-fixes.patch
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0002-U-Boot-BeagleBone-Cape-Manager.patch
-	mkdir -p /opt/source/u-boot_${u_boot_release_x15}/
-	wget --directory-prefix="/opt/source/u-boot_${u_boot_release_x15}/" ${rcn_https}/${u_boot_release_x15}/0001-am57xx_evm-fixes.patch
-	rm /home/${rfs_username}/.wget-hsts || true
-
-	echo "u-boot_${u_boot_release} : /opt/source/u-boot_${u_boot_release}" >> /opt/source/list.txt
-	echo "u-boot_${u_boot_release_x15} : /opt/source/u-boot_${u_boot_release_x15}" >> /opt/source/list.txt
-
 	chown -R ${rfs_username}:${rfs_username} /opt/source/
 }
 
