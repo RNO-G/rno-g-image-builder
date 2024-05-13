@@ -90,9 +90,15 @@ git_clone_full () {
 setup_system () {
   systemctl disable bbbio-set-sysconf
   systemctl disable unattended-upgrades
+  systemctl disable apt-daily.timer
+  systemctl disable apt-daily-upgrade.timer
+  systemctl disable apparmor 
   echo "#!/bin sh" > /etc/profile.d/add_sbin.sh
   echo "export PATH=\"/usr/local/sbin:/usr/sbin:/sbin:\$PATH\"" >> /etc/profile.d/add_sbin.sh
   echo spidev >> /etc/modules-load.d/modules.conf
+  echo "server 192.168.99.52 iburst" > /etc/chrony/sources.d/summit.source  
+  apt-get -y remove linux-image-6.1.0-21-rt-armmp 
+  apt-get -y install linux-headers-5.10.168-ti-r77
 }
 
 #setup_desktop () {
@@ -114,6 +120,7 @@ install_rno_g_software () {
   sed -i -e "s#PATH=#PATH=/rno-g/bin:#" /etc/profile
   echo "/rno-g/lib" >> /etc/ld.so.conf.d/rno-g.conf 
 
+  git config --global --add safe.directory '*'
 
   for gh_package in librno-g rno-g-ice-software rno-g-BBB-scripts control-uC radiant-python rnog-cal flowerpy rnog_gps stationrc rno-g-device-trees
   do
@@ -123,11 +130,17 @@ install_rno_g_software () {
     git_clone_full
 
    
+    chown -R rno-g:rno-g ${git_target_dir}
+
     echo "---------------------------------------------"
     echo ${gh_package} ${gh_repo} ${git_target_dir}
     echo "---------------------------------------------"
     cd ${git_target_dir} 
 
+
+    if [ "$gh_package" == "radiant-python" ] ;  then
+	  git checkout sampling_rate_and_tuning || echo "couldn't checkout"
+    fi
     if [ -f requirements.txt ] ; then 
       pip3 install --break-system-packages -r requirements.txt
     fi 
@@ -152,17 +165,14 @@ install_rno_g_software () {
       fi
     fi 
 
-
     chown -R rno-g:rno-g ${git_target_dir}
 
   done
 
   chown -R rno-g:rno-g /rno-g
 
-# sampling_rate_and_tuning branch, for now
-  cd /home/rno-g
+  #compatibility alias
   ln -s radiant-python radpy-cal 
-  cd radiant-python && git checkout sampling_rate_and_tuning 
 
 
 #  #download swissbit lifetime monitoring tool (not anymore, it seems to have disappeared?) 
