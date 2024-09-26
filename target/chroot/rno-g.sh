@@ -354,7 +354,7 @@ fi
 setup_keys() { 
 
 pip3 install ssh-import-id
-for gh_user in cozzyd jakobhenrichs tikarg ejobe ryankrebs016 
+for gh_user in cozzyd jakobhenrichs tikarg ejobe ryankrebs016 philippwindischhofer 
 do
 ssh-import-id gh:$gh_user|| true
 done
